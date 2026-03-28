@@ -1,0 +1,28 @@
+# =============================================================================
+# Market Data Pipeline — Python dependencies
+# =============================================================================
+
+# ── Data fetching ─────────────────────────────────────────────────────────────
+yfinance==0.2.40            # Yahoo Finance — free stock OHLCV, no API key needed
+requests==2.32.3            # HTTP client for CoinGecko API calls
+
+# ── Data processing ──────────────────────────────────────────────────────────
+pandas==2.2.2               # DataFrame manipulation — cleaning, resampling, indicators
+numpy==1.26.4               # Numerical operations (used by pandas under the hood)
+
+# ── Database ──────────────────────────────────────────────────────────────────
+psycopg2-binary==2.9.9      # PostgreSQL driver (binary = no build deps needed)
+sqlalchemy==2.0.30          # SQL toolkit — used for DB connections in the loaders
+alembic==1.13.1             # DB migrations (for future schema changes)
+
+# ── API ───────────────────────────────────────────────────────────────────────
+fastapi==0.111.0            # REST API framework
+uvicorn[standard]==0.30.1   # ASGI server that runs FastAPI
+python-dotenv==1.0.1        # Load .env files for local development
+
+# ── Airflow (installed separately in its own container, listed here for ref) ──
+# apache-airflow==2.9.1     # Do NOT pip install this — use the official Docker image
+
+# ── Dev / testing ─────────────────────────────────────────────────────────────
+pytest==8.2.2
+httpx==0.27.0               # Async HTTP client used in FastAPI tests

@@ -1,0 +1,32 @@
+# =============================================================================
+# Dockerfile for the FastAPI service
+# =============================================================================
+# Multi-stage is overkill for this project — simple single-stage is fine.
+# We pin the Python version to avoid "works on my machine" issues.
+
+FROM python:3.11-slim
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Install system dependencies needed by psycopg2
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first — Docker caches this layer separately.
+# If you change code but not requirements, Docker skips the pip install step.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code
+COPY . .
+
+# Expose port 8000 (FastAPI default)
+EXPOSE 8000
+
+# Start the API server
+# --host 0.0.0.0 makes it accessible outside the container
+# --reload is for development — remove in production
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
