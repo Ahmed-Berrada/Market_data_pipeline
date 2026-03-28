@@ -86,8 +86,7 @@ def _load_ohlcv(df: pd.DataFrame, table: str, engine: Optional[Engine] = None) -
     Generic loader that writes a DataFrame to any of our tables.
 
     Strategy: write to a temp table first, then INSERT ... ON CONFLICT DO NOTHING
-    into the real table. This is the safest way to do idempotent inserts
-    (running twice = same result).
+    into the real table. This is the safest way to do idempotent inserts.
     """
     if df.empty:
         logger.warning(f"Empty DataFrame — nothing to load into {table}")
@@ -95,48 +94,58 @@ def _load_ohlcv(df: pd.DataFrame, table: str, engine: Optional[Engine] = None) -
 
     eng = engine or get_engine()
 
-    # Ensure time column is UTC
+    # Ensure time column is UTC and properly formatted
     df = df.copy()
     df["time"] = pd.to_datetime(df["time"], utc=True)
 
     logger.info(f"Loading {len(df)} rows into {table}...")
     start = time.time()
 
-    with eng.connect() as conn:
-        # Write to a temporary staging table
-        temp_table = f"_temp_{table}_{int(time.time())}"
+    # Create a unique name for the temporary staging table
+    temp_table = f"_temp_{table}_{int(time.time())}"
 
+    try:
+        # 1. Write to the staging table using the ENGINE
+        # Pandas handles its own connection lifecycle here
         df.to_sql(
             name=temp_table,
-            con=conn,
+            con=eng,
             if_exists="replace",
             index=False,
-            method="multi",   # batch insert — much faster than row by row
+            method="multi",   # batch insert — much faster
             chunksize=1000,
         )
 
-        # Insert from staging into real table, skipping duplicates
-        # ON CONFLICT DO NOTHING = if (time, symbol) already exists, skip it
-        result = conn.execute(text(f"""
-            INSERT INTO {table}
-            SELECT * FROM "{temp_table}"
-            ON CONFLICT DO NOTHING
-        """))
+        # 2. Move data to the final table using a TRANSACTION (eng.begin)
+        # This will auto-commit if successful or auto-rollback if it fails
+        with eng.begin() as conn:
+            # Insert from staging into real table, skipping duplicates
+            # Note: Requires a UNIQUE constraint on (time, symbol) in the DB
+            result = conn.execute(text(f"""
+                INSERT INTO {table}
+                SELECT * FROM "{temp_table}"
+                ON CONFLICT DO NOTHING
+            """))
 
-        rows_inserted = result.rowcount
+            rows_inserted = result.rowcount
 
-        # Drop the temp table
-        conn.execute(text(f'DROP TABLE IF EXISTS "{temp_table}"'))
-        conn.commit()
+            # Clean up the staging table
+            conn.execute(text(f'DROP TABLE IF EXISTS "{temp_table}"'))
 
-    elapsed = time.time() - start
-    logger.info(
-        f"  Loaded {rows_inserted} new rows into {table} "
-        f"in {elapsed:.2f}s ({len(df) - rows_inserted} skipped as duplicates)"
-    )
+        elapsed = time.time() - start
+        logger.info(
+            f"  Loaded {rows_inserted} new rows into {table} "
+            f"in {elapsed:.2f}s ({len(df) - rows_inserted} skipped as duplicates)"
+        )
 
-    return rows_inserted
+        return rows_inserted
 
+    except Exception as e:
+        logger.error(f"Failed to load data into {table}: {e}")
+        # Ensure temp table is dropped even if the insert fails
+        with eng.begin() as conn:
+            conn.execute(text(f'DROP TABLE IF EXISTS "{temp_table}"'))
+        raise
 
 def log_pipeline_run(
     dag_id: str,

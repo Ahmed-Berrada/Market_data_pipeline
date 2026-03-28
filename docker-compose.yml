@@ -25,8 +25,9 @@ services:
   # ─── 1. TimescaleDB ─────────────────────────────────────────────────────────
   # This is our MAIN data store — PostgreSQL with the TimescaleDB extension.
   # All OHLCV market data lives here.
+  # Changed to standard Postgres for RAILWAY
   timescaledb:
-    image: timescale/timescaledb:latest-pg16
+    image: postgres:16
     environment:
       POSTGRES_USER: pipeline
       POSTGRES_PASSWORD: pipeline
