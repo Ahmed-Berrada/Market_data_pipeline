@@ -38,7 +38,7 @@ def get_engine() -> Engine:
     SQLAlchemy is a Python SQL toolkit. An "engine" is the connection
     pool to the database — we create it once and reuse it.
     """
-    db_url = os.environ.get("DATABASE_URL") or os.environ.get("PIPELINE_DB_CONN")
+    db_url = os.environ.get("DATABASE_URL")
     if not db_url:
         raise RuntimeError(
             "DATABASE_URL not set. "
