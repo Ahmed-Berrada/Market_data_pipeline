@@ -29,4 +29,4 @@ EXPOSE 8000
 # Start the API server
 # --host 0.0.0.0 makes it accessible outside the container
 # --reload is for development — remove in production
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
