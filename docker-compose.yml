@@ -8,8 +8,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-    # Our pipeline DB connection (passed into DAGs via env)
-    PIPELINE_DB_CONN: postgresql://pipeline:pipeline@timescaledb:5432/marketdata
+    PIPELINE_DB_CONN: ${DATABASE_URL}
+    DATABASE_URL: ${DATABASE_URL}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./extractors:/opt/airflow/extractors
@@ -108,7 +108,7 @@ services:
       context: .
       dockerfile: Dockerfile.api
     environment:
-      DATABASE_URL: postgresql://pipeline:pipeline@timescaledb:5432/marketdata
+      DATABASE_URL: ${PIPELINE_DB_CONN}
     ports:
       - "8000:8000"
     depends_on:
