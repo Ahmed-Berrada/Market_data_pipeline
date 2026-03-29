@@ -1,6 +1,7 @@
-# ─── SHARED ENV for Airflow components ───────────────────────────────────────
+﻿# ─── SHARED ENV for Airflow components ───────────────────────────────────────
 x-airflow-common: &airflow-common
   image: apache/airflow:2.9.1
+  env_file: .env
   environment: &airflow-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
@@ -8,8 +9,6 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-    PIPELINE_DB_CONN: ${DATABASE_URL}
-    DATABASE_URL: ${DATABASE_URL}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./extractors:/opt/airflow/extractors
@@ -19,33 +18,8 @@ x-airflow-common: &airflow-common
   depends_on:
     postgres-airflow:
       condition: service_healthy
-
 services:
-
-  # ─── 1. TimescaleDB ─────────────────────────────────────────────────────────
-  # This is our MAIN data store — PostgreSQL with the TimescaleDB extension.
-  # All OHLCV market data lives here.
-  # Changed to standard Postgres for RAILWAY
-  timescaledb:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: pipeline
-      POSTGRES_PASSWORD: pipeline
-      POSTGRES_DB: marketdata
-    ports:
-      - "5433:5432"   # 5433 on host to avoid conflict with local Postgres
-    volumes:
-      - timescale-data:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql  # auto-runs on first start
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pipeline -d marketdata"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ─── 2. Postgres for Airflow metadata ───────────────────────────────────────
-  # Airflow needs its own DB to track DAG runs, task states, logs etc.
-  # Keep it separate from our market data DB.
+  # ─── 1. Postgres for Airflow metadata ───────────────────────────────────────
   postgres-airflow:
     image: postgres:16
     environment:
@@ -59,10 +33,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # ─── 3. Airflow init ────────────────────────────────────────────────────────
-  # One-shot container: migrates the Airflow DB and creates the admin user.
-  # Runs once then exits — that's normal.
+  # ─── 2. Airflow init ────────────────────────────────────────────────────────
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
@@ -78,9 +49,7 @@ services:
           --role Admin \
           --email admin@example.com
     restart: "no"
-
-  # ─── 4. Airflow Webserver ───────────────────────────────────────────────────
-  # The UI at http://localhost:8080 — admin/admin to log in
+  # ─── 3. Airflow Webserver ───────────────────────────────────────────────────
   airflow-webserver:
     <<: *airflow-common
     command: webserver
@@ -90,9 +59,7 @@ services:
       airflow-init:
         condition: service_completed_successfully
     restart: unless-stopped
-
-  # ─── 5. Airflow Scheduler ───────────────────────────────────────────────────
-  # The brain — scans DAGs, triggers tasks on schedule.
+  # ─── 4. Airflow Scheduler ───────────────────────────────────────────────────
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
@@ -100,23 +67,15 @@ services:
       airflow-init:
         condition: service_completed_successfully
     restart: unless-stopped
-
-  # ─── 6. FastAPI ─────────────────────────────────────────────────────────────
-  # REST API layer — the frontend calls this to get chart data.
+  # ─── 5. FastAPI ─────────────────────────────────────────────────────────────
   api:
     build:
       context: .
       dockerfile: Dockerfile.api
-    environment:
-      DATABASE_URL: ${PIPELINE_DB_CONN}
+    env_file: .env
     ports:
       - "8000:8000"
-    depends_on:
-      timescaledb:
-        condition: service_healthy
     restart: unless-stopped
-
 volumes:
-  timescale-data:
   airflow-db:
   airflow-logs:
