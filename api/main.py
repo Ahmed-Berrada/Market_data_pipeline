@@ -48,20 +48,23 @@ app = FastAPI(
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 # CORS = Cross-Origin Resource Sharing.
-# Without this, the browser will block requests from ahmedberrada.com → your API
-# because they're on different domains.
-# In production, replace "*" with your actual frontend URL.
-
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",          # Next.js dev server
-    "https://marketdatapipeline.ahmedberrada.com/", # Deployed frontend
+# Without this, the browser blocks cross-domain requests.
+DEFAULT_ALLOWED_ORIGINS = [
+    "http://localhost:3000",                  # Next.js dev server
+    "https://ahmedberrada.com",              # Portfolio root domain
+    "https://www.ahmedberrada.com",
+    "https://marketdatapipeline.ahmedberrada.com",  # Dedicated dashboard subdomain
 ]
+
+# Optional override/additions from env (comma-separated URLs)
+extra_origins = [o.strip() for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()]
+ALLOWED_ORIGINS = list(dict.fromkeys(DEFAULT_ALLOWED_ORIGINS + extra_origins))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET"],            # read-only API
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
 
