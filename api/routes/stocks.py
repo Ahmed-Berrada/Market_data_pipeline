@@ -4,7 +4,7 @@ api/routes/stocks.py
 Stock-related API endpoints.
 """
 
-from datetime import date, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -18,9 +18,9 @@ router = APIRouter()
 @router.get("/{symbol}/ohlcv")
 def get_stock_ohlcv(
     symbol: str,
-    from_date: Optional[date] = Query(default=None, alias="from"),
-    to_date: Optional[date] = Query(default=None, alias="to"),
-    limit: int = Query(default=365, le=1000),
+    from_date: Optional[datetime] = Query(default=None, alias="from"),
+    to_date: Optional[datetime] = Query(default=None, alias="to"),
+    limit: int = Query(default=5000, le=20000),
 ):
     """
     Get historical OHLCV data for a stock symbol.
@@ -30,7 +30,7 @@ def get_stock_ohlcv(
     symbol = symbol.upper()
 
     if to_date is None:
-        to_date = date.today()
+        to_date = datetime.now(timezone.utc)
     if from_date is None:
         from_date = to_date - timedelta(days=365)
 
@@ -135,8 +135,8 @@ def get_stock_latest(symbol: str):
 @router.get("/{symbol}/indicators")
 def get_stock_indicators(
     symbol: str,
-    from_date: Optional[date] = Query(default=None, alias="from"),
-    limit: int = Query(default=100, le=500),
+    from_date: Optional[datetime] = Query(default=None, alias="from"),
+    limit: int = Query(default=5000, le=20000),
 ):
     """
     Get pre-computed technical indicators (SMA-20, SMA-50, daily return).
@@ -146,7 +146,7 @@ def get_stock_indicators(
     symbol = symbol.upper()
 
     if from_date is None:
-        from_date = date.today() - timedelta(days=180)
+        from_date = datetime.now(timezone.utc) - timedelta(days=365)
 
     try:
         engine = get_engine()
@@ -166,6 +166,7 @@ def get_stock_indicators(
     return {
         "symbol": symbol,
         "count": len(rows),
+        "from": from_date.isoformat(),
         "data": [
             {
                 "time": row.time.isoformat(),

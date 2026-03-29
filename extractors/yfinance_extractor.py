@@ -34,14 +34,16 @@ def fetch_ohlcv(
     symbols: list[str],
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    interval: str = "1d",
 ) -> pd.DataFrame:
     """
-    Fetch daily OHLCV data for a list of stock symbols.
+    Fetch OHLCV data for a list of stock symbols.
 
     Args:
         symbols:    List of ticker symbols e.g. ['AAPL', 'MSFT']
         start_date: Start of the date range (default: 90 days ago)
         end_date:   End of the date range (default: today)
+        interval:   Yahoo interval, e.g. 1m, 5m, 15m, 60m, 1d
 
     Returns:
         DataFrame with columns: [time, symbol, open, high, low, close, volume, source]
@@ -55,14 +57,14 @@ def fetch_ohlcv(
 
     logger.info(
         f"Fetching OHLCV for {len(symbols)} symbols "
-        f"from {start_date} to {end_date}"
+        f"from {start_date} to {end_date} at interval={interval}"
     )
 
     all_rows = []
 
     for symbol in symbols:
         try:
-            rows = _fetch_single_symbol(symbol, start_date, end_date)
+            rows = _fetch_single_symbol(symbol, start_date, end_date, interval)
             all_rows.append(rows)
             logger.info(f"  {symbol}: {len(rows)} rows fetched")
         except Exception as e:
@@ -85,6 +87,7 @@ def _fetch_single_symbol(
     symbol: str,
     start_date: date,
     end_date: date,
+    interval: str,
 ) -> pd.DataFrame:
     """
     Fetch OHLCV for a single symbol and normalise the column names
@@ -99,6 +102,7 @@ def _fetch_single_symbol(
         start=start_date.isoformat(),
         end=end_date.isoformat(),
         auto_adjust=True,
+        interval=interval,
     )
 
     if raw.empty:

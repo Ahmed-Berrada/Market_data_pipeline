@@ -1,62 +1,59 @@
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { ChartTooltip, CandlestickChart } from "@/components/market/ChartParts";
-import { LegendItem, SectionLabel, Tab } from "@/components/market/Primitives";
-import type { AssetType, Indicator, OHLCV } from "@/types/market";
+import { ChartTooltip } from "@/components/market/ChartParts";
+import { SectionLabel, Tab } from "@/components/market/Primitives";
+import type { AssetType, ChartRange, OHLCV } from "@/types/market";
+
+const RANGE_OPTIONS: ChartRange[] = ["5m", "15m", "60m", "1d", "1w", "1mo", "3mo", "6mo", "1y"];
+
+const formatXAxis = (iso: string, range: ChartRange): string => {
+  const d = new Date(iso);
+  if (range === "5m" || range === "15m" || range === "60m" || range === "1d") {
+    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  }
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
 
 export function MarketChartSection({
   symbol,
   assetType,
-  chartTab,
-  setChartTab,
+  range,
+  setRange,
   loading,
   ohlcv,
-  indicators,
 }: {
   symbol: string;
   assetType: AssetType;
-  chartTab: "candle" | "sma" | "returns";
-  setChartTab: (tab: "candle" | "sma" | "returns") => void;
+  range: ChartRange;
+  setRange: (range: ChartRange) => void;
   loading: boolean;
   ohlcv: OHLCV[];
-  indicators: Indicator[];
 }) {
-  const returnsData = indicators.slice(-60).map((d) => ({
-    time: d.time.slice(5),
-    daily_return: d.daily_return ?? 0,
-  }));
-
-  const smaData = indicators.slice(-120).map((d) => ({
-    time: d.time.slice(5),
+  const chartData = ohlcv.map((d) => ({
+    time: d.time,
+    label: formatXAxis(d.time, range),
     close: d.close,
-    sma_20: d.sma_20,
-    sma_50: d.sma_50,
   }));
-
-  const hasIndicatorData = indicators.length > 0;
 
   return (
     <div style={{ marginBottom: 48 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <SectionLabel>
-            {symbol} · 180D · {assetType === "stock" ? "Yahoo Finance" : "CoinGecko"}
-          </SectionLabel>
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <Tab active={chartTab === "candle"} onClick={() => setChartTab("candle")}>Candlestick</Tab>
-          <Tab active={chartTab === "sma"} onClick={() => setChartTab("sma")}>SMA</Tab>
-          <Tab active={chartTab === "returns"} onClick={() => setChartTab("returns")}>Returns</Tab>
+        <SectionLabel>
+          {symbol} · {range.toUpperCase()} · {assetType === "stock" ? "Yahoo Finance" : "CoinGecko"}
+        </SectionLabel>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {RANGE_OPTIONS.map((opt) => (
+            <Tab key={opt} active={range === opt} onClick={() => setRange(opt)}>
+              {opt}
+            </Tab>
+          ))}
         </div>
       </div>
 
@@ -75,62 +72,11 @@ export function MarketChartSection({
               color: "var(--text-muted)",
             }}
           >
-            LOADING OHLCV...
+            LOADING PRICE SERIES...
           </div>
         )}
 
-        {!loading && chartTab === "candle" && <CandlestickChart data={ohlcv} />}
-
-        {!loading && chartTab === "sma" && hasIndicatorData && (
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={smaData} margin={{ top: 8, right: 8, bottom: 8, left: 32 }}>
-              <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
-              <XAxis
-                dataKey="time"
-                tick={{ fontFamily: "var(--font-mono)", fontSize: 9, fill: "var(--text-muted)" }}
-                tickLine={false}
-                axisLine={{ stroke: "var(--border)" }}
-                interval={20}
-              />
-              <YAxis
-                tick={{ fontFamily: "var(--font-mono)", fontSize: 9, fill: "var(--text-muted)" }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(0))}
-              />
-              <Tooltip content={<ChartTooltip />} />
-              <Line dataKey="close" name="close" stroke="var(--text-dim)" dot={false} strokeWidth={1} strokeOpacity={0.6} />
-              <Line dataKey="sma_20" name="SMA-20" stroke="var(--accent)" dot={false} strokeWidth={1.5} />
-              <Line dataKey="sma_50" name="SMA-50" stroke="var(--navy-light)" dot={false} strokeWidth={1.5} />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-
-        {!loading && chartTab === "returns" && hasIndicatorData && (
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={returnsData} margin={{ top: 8, right: 8, bottom: 8, left: 32 }}>
-              <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
-              <XAxis
-                dataKey="time"
-                tick={{ fontFamily: "var(--font-mono)", fontSize: 9, fill: "var(--text-muted)" }}
-                tickLine={false}
-                axisLine={{ stroke: "var(--border)" }}
-                interval={10}
-              />
-              <YAxis
-                tick={{ fontFamily: "var(--font-mono)", fontSize: 9, fill: "var(--text-muted)" }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v) => `${v.toFixed(1)}%`}
-              />
-              <ReferenceLine y={0} stroke="var(--border-2)" strokeWidth={1} />
-              <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="daily_return" name="daily_return" fill="var(--accent)" opacity={0.7} radius={[1, 1, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-
-        {!loading && (chartTab === "sma" || chartTab === "returns") && !hasIndicatorData && (
+        {!loading && chartData.length === 0 && (
           <div
             style={{
               height: 240,
@@ -143,36 +89,43 @@ export function MarketChartSection({
               color: "var(--text-muted)",
             }}
           >
-            NO INDICATOR DATA AVAILABLE FOR THIS ASSET
+            NO DATA AVAILABLE FOR THIS RANGE
           </div>
         )}
 
-        {!loading && (
+        {!loading && chartData.length > 0 && (
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 32 }}>
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontFamily: "var(--font-mono)", fontSize: 9, fill: "var(--text-muted)" }}
+                tickLine={false}
+                axisLine={{ stroke: "var(--border)" }}
+                minTickGap={18}
+              />
+              <YAxis
+                tick={{ fontFamily: "var(--font-mono)", fontSize: 9, fill: "var(--text-muted)" }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(2))}
+              />
+              <Tooltip content={<ChartTooltip />} labelFormatter={(_, payload) => payload?.[0]?.payload?.time ?? ""} />
+              <Line type="monotone" dataKey="close" name="close" stroke="var(--accent)" dot={false} strokeWidth={1.7} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+
+        {!loading && chartData.length > 0 && (
           <div style={{ display: "flex", gap: 20, marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-            {chartTab === "candle" && (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ width: 10, height: 10, border: "1px solid var(--accent)", background: "var(--accent)" }} />
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-muted)" }}>BULLISH</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ width: 10, height: 10, border: "1px solid #ef4444" }} />
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-muted)" }}>BEARISH</span>
-                </div>
-              </>
-            )}
-            {chartTab === "sma" && (
-              <>
-                <LegendItem color="var(--accent)" label="SMA-20 · Short-term trend" />
-                <LegendItem color="var(--navy-light)" label="SMA-50 · Medium-term trend" />
-                <LegendItem color="var(--text-dim)" label="Close price" />
-              </>
-            )}
-            {chartTab === "returns" && (
-              <LegendItem color="var(--accent)" label="Daily return · (close_t − close_t-1) / close_t-1" />
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 20, height: 1.5, background: "var(--accent)" }} />
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-muted)" }}>
+                Close price (hover to inspect exact value)
+              </span>
+            </div>
             <div style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-muted)" }}>
-              {assetType === "stock" ? "SOURCE · YAHOO FINANCE · DAILY BARS" : "SOURCE · COINGECKO · DAILY BARS"}
+              {assetType === "stock" ? "SOURCE · YAHOO FINANCE" : "SOURCE · COINGECKO"}
             </div>
           </div>
         )}

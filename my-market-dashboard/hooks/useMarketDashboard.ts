@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CRYPTOS, STOCKS } from "@/lib/market/constants";
 import { fetchChartData, fetchLatest, fetchPipelineStatus } from "@/lib/market/api";
-import type { AssetType, Indicator, Latest, OHLCV, PipelineStatus } from "@/types/market";
+import type { AssetType, ChartRange, Indicator, Latest, OHLCV, PipelineStatus } from "@/types/market";
 
-export function useMarketDashboard(symbol: string, assetType: AssetType) {
+export function useMarketDashboard(symbol: string, assetType: AssetType, range: ChartRange) {
   const [ohlcv, setOhlcv] = useState<OHLCV[]>([]);
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [latests, setLatests] = useState<Record<string, Latest>>({});
@@ -14,7 +14,7 @@ export function useMarketDashboard(symbol: string, assetType: AssetType) {
   const loadChart = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchChartData(symbol, assetType);
+      const data = await fetchChartData(symbol, assetType, range);
       setOhlcv(data.ohlcv.data ?? []);
       setIndicators(data.indicators?.data ?? []);
     } catch {
@@ -23,7 +23,7 @@ export function useMarketDashboard(symbol: string, assetType: AssetType) {
     } finally {
       setLoading(false);
     }
-  }, [assetType, symbol]);
+  }, [assetType, range, symbol]);
 
   const loadAllLatest = useCallback(async () => {
     const assets = [

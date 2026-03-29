@@ -46,15 +46,13 @@ default_args = {
 
 dag = DAG(
     dag_id="stocks_daily",
-    description="Fetch daily OHLCV for tracked stocks and load into TimescaleDB",
+    description="Fetch intraday stock OHLCV for tracked stocks and load into TimescaleDB",
     default_args=default_args,
-    # Cron: minute hour day month weekday
-    # "0 18 * * 1-5" = 6pm UTC, Monday through Friday (markets close at ~4pm ET = ~9pm UTC,
-    # but yfinance data is available after ~6pm UTC usually)
-    schedule="0 18 * * 1-5",
+    # Every minute, weekdays
+    schedule="*/1 * * * 1-5",
     start_date=datetime(2024, 1, 1),
-    catchup=False,              # don't backfill all missed runs since start_date
-    tags=["stocks", "daily"],
+    catchup=False,
+    tags=["stocks", "intraday"],
 )
 
 # ── Symbols to track ──────────────────────────────────────────────────────────
@@ -68,17 +66,22 @@ SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"]
 
 def task_extract(**context):
     """
-    EXTRACT: Fetch raw OHLCV from Yahoo Finance.
+    EXTRACT: Fetch raw intraday OHLCV from Yahoo Finance.
     Pushes the result as a JSON string to XCom.
     """
     from extractors.yfinance_extractor import fetch_ohlcv
     from datetime import date
 
-    # Fetch yesterday's data (today's data isn't fully available yet)
-    end_date = date.today()
-    start_date = end_date - timedelta(days=2)  # small window — just catch up
+    # 1m bars are limited by Yahoo; keep a short rolling window.
+    end_date = date.today() + timedelta(days=1)
+    start_date = end_date - timedelta(days=2)
 
-    df = fetch_ohlcv(SYMBOLS, start_date=start_date, end_date=end_date)
+    df = fetch_ohlcv(
+        SYMBOLS,
+        start_date=start_date,
+        end_date=end_date,
+        interval="1m",
+    )
 
     if df.empty:
         raise ValueError("Extraction returned empty DataFrame — no data fetched")

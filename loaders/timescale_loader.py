@@ -92,6 +92,14 @@ def _load_ohlcv(df: pd.DataFrame, table: str, engine: Optional[Engine] = None) -
         logger.warning(f"Empty DataFrame — nothing to load into {table}")
         return 0
 
+    conflict_targets = {
+        "stock_prices": "(time, symbol)",
+        "crypto_prices": "(time, symbol)",
+        "price_indicators": "(time, symbol, asset_type)",
+    }
+    if table not in conflict_targets:
+        raise ValueError(f"Unsupported table for loader: {table}")
+
     eng = engine or get_engine()
 
     # Ensure time column is UTC and properly formatted
@@ -119,12 +127,11 @@ def _load_ohlcv(df: pd.DataFrame, table: str, engine: Optional[Engine] = None) -
         # 2. Move data to the final table using a TRANSACTION (eng.begin)
         # This will auto-commit if successful or auto-rollback if it fails
         with eng.begin() as conn:
-            # Insert from staging into real table, skipping duplicates
-            # Note: Requires a UNIQUE constraint on (time, symbol) in the DB
+            # Insert from staging into real table, skipping duplicates.
             result = conn.execute(text(f"""
                 INSERT INTO {table}
                 SELECT * FROM "{temp_table}"
-                ON CONFLICT DO NOTHING
+                ON CONFLICT {conflict_targets[table]} DO NOTHING
             """))
 
             rows_inserted = result.rowcount

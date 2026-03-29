@@ -9,16 +9,16 @@ import { MarketChartSection } from "@/components/market/MarketChartSection";
 import { MarketTickerSection } from "@/components/market/MarketTickerSection";
 import { PipelineSection } from "@/components/market/PipelineSection";
 import { useMarketDashboard } from "@/hooks/useMarketDashboard";
-import type { AssetType } from "@/types/market";
+import type { AssetType, ChartRange } from "@/types/market";
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PipelineDashboard() {
   const [symbol, setSymbol] = useState("AAPL");
   const [assetType, setAssetType] = useState<AssetType>("stock");
-  const [chartTab, setChartTab] = useState<"candle" | "sma" | "returns">("candle");
+  const [range, setRange] = useState<ChartRange>("1y");
 
-  const { ohlcv, indicators, latests, pipeline, loading } = useMarketDashboard(symbol, assetType);
+  const { ohlcv, latests, pipeline, loading } = useMarketDashboard(symbol, assetType, range);
 
   const lastRun = pipeline?.pipelines?.[0]?.last_run;
 
@@ -40,11 +40,10 @@ export default function PipelineDashboard() {
         <MarketChartSection
           symbol={symbol}
           assetType={assetType}
-          chartTab={chartTab}
-          setChartTab={setChartTab}
+          range={range}
+          setRange={setRange}
           loading={loading}
           ohlcv={ohlcv}
-          indicators={indicators}
         />
 
         <PipelineSection pipeline={pipeline} />

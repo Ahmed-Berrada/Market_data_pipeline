@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS stock_prices (
 
 -- In standard Postgres, we just use a regular B-Tree index for performance
 CREATE INDEX IF NOT EXISTS idx_stock_symbol_time ON stock_prices (symbol, time DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_stock_time_symbol ON stock_prices (time, symbol);
 
 -- 2. Crypto prices (OHLCV)
 CREATE TABLE IF NOT EXISTS crypto_prices (
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS crypto_prices (
 );
 
 CREATE INDEX IF NOT EXISTS idx_crypto_symbol_time ON crypto_prices (symbol, time DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crypto_time_symbol ON crypto_prices (time, symbol);
 
 -- 3. Derived indicators
 CREATE TABLE IF NOT EXISTS price_indicators (
@@ -43,6 +45,7 @@ CREATE TABLE IF NOT EXISTS price_indicators (
 );
 
 CREATE INDEX IF NOT EXISTS idx_indicators_symbol_time ON price_indicators (symbol, time DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_indicators_time_symbol_asset ON price_indicators (time, symbol, asset_type);
 
 -- 4. Pipeline run log
 CREATE TABLE IF NOT EXISTS pipeline_runs (

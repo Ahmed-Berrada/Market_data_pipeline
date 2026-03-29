@@ -1,4 +1,5 @@
 export type AssetType = "stock" | "crypto";
+export type ChartRange = "5m" | "15m" | "60m" | "1d" | "1w" | "1mo" | "3mo" | "6mo" | "1y";
 
 export interface OHLCV {
   time: string;
@@ -45,4 +46,3 @@ export interface OhlcvResponse {
 export interface IndicatorsResponse {
   data?: Indicator[];
 }
-

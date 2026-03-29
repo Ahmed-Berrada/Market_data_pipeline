@@ -13,8 +13,10 @@ Endpoints:
   GET /                            → health check
   GET /api/stocks/{symbol}/ohlcv   → historical OHLCV for a stock
   GET /api/stocks/{symbol}/latest  → latest price for a stock
+  GET /api/stocks/{symbol}/indicators → stock SMA-20, SMA-50, daily return
   GET /api/crypto/{symbol}/ohlcv   → historical OHLCV for a crypto
   GET /api/crypto/{symbol}/latest  → latest price for a crypto
+  GET /api/crypto/{symbol}/indicators → crypto SMA-20, SMA-50, daily return
   GET /api/pipeline/status         → last pipeline run info
   GET /api/assets/list             → all tracked symbols
 

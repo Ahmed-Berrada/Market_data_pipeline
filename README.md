@@ -155,6 +155,7 @@ frontend/                     # Next.js dashboard (deployed to Vercel)
 | `GET /api/stocks/{symbol}/indicators` | SMA-20, SMA-50, daily returns |
 | `GET /api/crypto/{symbol}/ohlcv` | Crypto historical OHLCV |
 | `GET /api/crypto/{symbol}/latest` | Latest crypto price |
+| `GET /api/crypto/{symbol}/indicators` | Crypto SMA-20, SMA-50, daily returns |
 | `GET /api/pipeline/status` | Last run times, row counts |
 
 Full interactive docs at `/docs`.
@@ -221,3 +222,22 @@ Set `NEXT_PUBLIC_API_URL` to your Railway API URL.
 | CoinGecko public | Crypto OHLCV | ~30 req/min |
 
 No API keys required to run this project.
+
+---
+
+## Scheduler (GitHub Actions)
+
+Airflow is the primary orchestrator for this project. The GitHub Actions workflow `/.github/workflows/backfill-scheduler.yml` is kept as a manual fallback (`workflow_dispatch`) only.
+
+1. Add this repository secret:
+   - `DATABASE_URL` = your production Postgres connection string
+2. Manual run (fallback):
+   - GitHub -> Actions -> Backfill Scheduler -> Run workflow
+   - Choose `target` (`all`, `crypto`, `stocks`) and optional `days`
+
+The loader uses `ON CONFLICT (...) DO NOTHING` and the schema enforces unique indexes:
+- `stock_prices (time, symbol)`
+- `crypto_prices (time, symbol)`
+- `price_indicators (time, symbol, asset_type)`
+
+This prevents duplicates when the same backfill window runs multiple times.
