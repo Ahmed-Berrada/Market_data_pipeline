@@ -54,20 +54,24 @@ def _read_xcom_json_df(payload: str):
 
 def task_extract(**context):
     from extractors.coingecko_extractor import fetch_ohlcv
-    from datetime import date
 
-    # For frequent runs we just want the last 2 days
-    # The ON CONFLICT DO NOTHING in the loader handles any duplicates
-    end_date = date.today()
-    start_date = end_date - timedelta(days=2)
+    # Use a rolling UTC datetime window to fetch real intraday points.
+    logical_date = context.get("logical_date")
+    end_dt = logical_date.astimezone(timezone.utc) if logical_date else datetime.now(timezone.utc)
+    start_dt = end_dt - timedelta(hours=24)
 
-    df = fetch_ohlcv(SYMBOLS, start_date=start_date, end_date=end_date)
+    df = fetch_ohlcv(SYMBOLS, start_dt=start_dt, end_dt=end_dt, interval="5min")
 
     if df.empty:
         raise ValueError("No crypto data fetched")
 
     context["task_instance"].xcom_push(key="raw_data", value=df.to_json(date_format="iso"))
-    logger.info(f"Extracted {len(df)} crypto rows")
+    logger.info(
+        "Extracted %s crypto rows between %s and %s",
+        len(df),
+        start_dt.isoformat(),
+        end_dt.isoformat(),
+    )
     return len(df)
 
 

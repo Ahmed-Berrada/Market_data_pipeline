@@ -50,14 +50,16 @@ SYMBOL_TO_ID = {
 }
 
 DEFAULT_SYMBOLS = ["BTC", "ETH", "SOL", "BNB"]
-SUPPORTED_OHLC_DAYS = [1, 7, 14, 30, 90, 180, 365]
 
 
 def fetch_ohlcv(
     symbols: list[str],
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    start_dt: Optional[datetime] = None,
+    end_dt: Optional[datetime] = None,
     vs_currency: str = "usd",
+    interval: str = "5min",
 ) -> pd.DataFrame:
     """
     Fetch daily OHLCV for a list of crypto symbols.
@@ -71,13 +73,28 @@ def fetch_ohlcv(
     Returns:
         DataFrame with columns: [time, symbol, open, high, low, close, volume, source]
     """
-    if end_date is None:
-        end_date = date.today()
-    if start_date is None:
-        start_date = end_date - timedelta(days=90)
+    if end_dt is None:
+        if end_date is not None:
+            end_dt = datetime.combine(end_date, datetime.max.time(), tzinfo=timezone.utc)
+        else:
+            end_dt = datetime.now(timezone.utc)
+    else:
+        end_dt = _ensure_utc(end_dt)
+
+    if start_dt is None:
+        if start_date is not None:
+            start_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
+        else:
+            # Keep a short window so CoinGecko returns dense enough intraday points.
+            start_dt = end_dt - timedelta(hours=24)
+    else:
+        start_dt = _ensure_utc(start_dt)
+
+    if start_dt >= end_dt:
+        raise ValueError("start_dt must be before end_dt")
 
     logger.info(
-        f"Fetching crypto OHLCV for {symbols} from {start_date} to {end_date}"
+        f"Fetching crypto OHLCV for {symbols} from {start_dt.isoformat()} to {end_dt.isoformat()}"
     )
 
     all_rows = []
@@ -89,7 +106,14 @@ def fetch_ohlcv(
             continue
 
         try:
-            rows = _fetch_single_coin(symbol, coin_id, start_date, end_date, vs_currency)
+            rows = _fetch_single_coin(
+                symbol,
+                coin_id,
+                start_dt,
+                end_dt,
+                vs_currency,
+                interval,
+            )
             all_rows.append(rows)
             logger.info(f"  {symbol}: {len(rows)} rows fetched")
 
@@ -111,32 +135,17 @@ def fetch_ohlcv(
 def _fetch_single_coin(
     symbol: str,
     coin_id: str,
-    start_date: date,
-    end_date: date,
+    start_dt: datetime,
+    end_dt: datetime,
     vs_currency: str,
+    interval: str,
 ) -> pd.DataFrame:
     """
-    Fetch OHLCV for a single coin using CoinGecko's OHLC endpoint.
-
-    CoinGecko's OHLC endpoint returns data in this format:
-        [[timestamp_ms, open, high, low, close], ...]
-
-    Note: CoinGecko doesn't return volume in the OHLC endpoint.
-    We fetch volume separately from the market_chart endpoint and merge.
+    Fetch OHLCV for a single coin from CoinGecko market_chart/range.
+    We build true intraday candles by resampling price ticks to the requested interval.
     """
-    # Convert dates to Unix timestamps (CoinGecko uses seconds)
-    start_ts = int(datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc).timestamp())
-    end_ts = int(datetime.combine(end_date, datetime.min.time(), tzinfo=timezone.utc).timestamp())
-
-    # ── Fetch OHLC ────────────────────────────────────────────────────────────
-    ohlc_url = f"{COINGECKO_BASE}/coins/{coin_id}/ohlc"
-    ohlc_params = {"vs_currency": vs_currency, "days": _days_between(start_date, end_date)}
-
-    ohlc_resp = _get(ohlc_url, ohlc_params)
-    ohlc_data = ohlc_resp.json()
-
-    if not ohlc_data:
-        raise ValueError(f"Empty OHLC response for {coin_id}")
+    start_ts = int(start_dt.timestamp())
+    end_ts = int(end_dt.timestamp())
 
     # ── Fetch volume (separate endpoint) ─────────────────────────────────────
     chart_url = f"{COINGECKO_BASE}/coins/{coin_id}/market_chart/range"
@@ -149,40 +158,59 @@ def _fetch_single_coin(
     chart_resp = _get(chart_url, chart_params)
     chart_data = chart_resp.json()
 
-    # ── Build OHLC DataFrame ──────────────────────────────────────────────────
-    ohlc_df = pd.DataFrame(ohlc_data, columns=["timestamp_ms", "open", "high", "low", "close"])
-    ohlc_df["time"] = pd.to_datetime(ohlc_df["timestamp_ms"], unit="ms", utc=True)
-    ohlc_df = ohlc_df.drop(columns=["timestamp_ms"])
+    if "prices" not in chart_data or not chart_data["prices"]:
+        raise ValueError(f"Empty price response for {coin_id}")
 
-    # Aggregate to daily (CoinGecko OHLC can return 4-hourly candles for short ranges)
-    ohlc_df["date"] = ohlc_df["time"].dt.date
-    daily_ohlc = ohlc_df.groupby("date").agg(
-        open=("open", "first"),
-        high=("high", "max"),
-        low=("low", "min"),
-        close=("close", "last"),
-    ).reset_index()
+    price_df = pd.DataFrame(chart_data["prices"], columns=["timestamp_ms", "price"])
+    price_df["time"] = pd.to_datetime(price_df["timestamp_ms"], unit="ms", utc=True)
+    price_df = price_df.drop(columns=["timestamp_ms"])
+    price_df = price_df[
+        (price_df["time"] >= start_dt) & (price_df["time"] <= end_dt)
+    ].copy()
+
+    if price_df.empty:
+        raise ValueError(f"No prices in requested window for {coin_id}")
+
+    candles = (
+        price_df
+        .set_index("time")["price"]
+        .resample(interval, label="right", closed="right")
+        .ohlc()
+        .dropna()
+    )
 
     # ── Build volume DataFrame ────────────────────────────────────────────────
     if "total_volumes" in chart_data and chart_data["total_volumes"]:
         vol_df = pd.DataFrame(chart_data["total_volumes"], columns=["timestamp_ms", "volume"])
-        vol_df["date"] = pd.to_datetime(vol_df["timestamp_ms"], unit="ms", utc=True).dt.date
-        vol_daily = vol_df.groupby("date")["volume"].sum().reset_index()
-        daily_ohlc = daily_ohlc.merge(vol_daily, on="date", how="left")
+        vol_df["time"] = pd.to_datetime(vol_df["timestamp_ms"], unit="ms", utc=True)
+        vol_df = vol_df.drop(columns=["timestamp_ms"])
+        vol_df = vol_df[
+            (vol_df["time"] >= start_dt) & (vol_df["time"] <= end_dt)
+        ].copy()
+
+        volume = (
+            vol_df
+            .set_index("time")["volume"]
+            .resample(interval, label="right", closed="right")
+            .sum(min_count=1)
+        )
+        candles = candles.join(volume.rename("volume"), how="left")
     else:
-        daily_ohlc["volume"] = None
+        candles["volume"] = None
 
-    # ── Final cleanup ─────────────────────────────────────────────────────────
-    # OHLC endpoint returns a bucketed window; trim back to exact requested range.
-    daily_ohlc = daily_ohlc[
-        (daily_ohlc["date"] >= start_date) & (daily_ohlc["date"] <= end_date)
-    ].copy()
+    candles = candles.reset_index()
+    candles["volume"] = pd.to_numeric(candles["volume"], errors="coerce").fillna(0)
+    candles["symbol"] = symbol.upper()
+    candles["source"] = "coingecko"
 
-    daily_ohlc["time"] = pd.to_datetime(daily_ohlc["date"], utc=True)
-    daily_ohlc["symbol"] = symbol.upper()
-    daily_ohlc["source"] = "coingecko"
+    return candles[["time", "symbol", "open", "high", "low", "close", "volume", "source"]]
 
-    return daily_ohlc[["time", "symbol", "open", "high", "low", "close", "volume", "source"]]
+
+def _ensure_utc(dt: datetime) -> datetime:
+    """Return timezone-aware UTC datetime from naive or timezone-aware input."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _get(url: str, params: dict, retries: int = 3) -> requests.Response:
@@ -209,16 +237,6 @@ def _get(url: str, params: dict, retries: int = 3) -> requests.Response:
 
     raise RuntimeError(f"Failed after {retries} retries: {url}")
 
-
-def _days_between(start: date, end: date) -> int | str:
-    delta = max(1, (end - start).days)
-
-    # CoinGecko /ohlc accepts only fixed values for "days".
-    for allowed in SUPPORTED_OHLC_DAYS:
-        if delta <= allowed:
-            return allowed
-
-    return "max"
 
 
 def fetch_latest_price(symbol: str, vs_currency: str = "usd") -> dict:

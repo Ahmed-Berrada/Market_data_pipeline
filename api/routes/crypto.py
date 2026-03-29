@@ -49,7 +49,13 @@ def get_crypto_ohlcv(
         raise HTTPException(status_code=500, detail=str(e))
 
     if not rows:
-        raise HTTPException(status_code=404, detail=f"No data for {symbol}")
+        return {
+            "symbol": symbol,
+            "from": from_date.isoformat(),
+            "to": to_date.isoformat(),
+            "count": 0,
+            "data": [],
+        }
 
     return {
         "symbol": symbol,
