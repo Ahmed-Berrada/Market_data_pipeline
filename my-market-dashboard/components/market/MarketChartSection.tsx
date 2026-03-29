@@ -12,16 +12,56 @@ import { SectionLabel, Tab } from "@/components/market/Primitives";
 import type { AssetType, ChartRange, OHLCV } from "@/types/market";
 
 const RANGE_OPTIONS: ChartRange[] = ["5m", "15m", "60m", "1d", "1w", "1mo", "3mo", "6mo", "1y"];
+const LONG_DAY_RANGES: ChartRange[] = ["1mo", "3mo", "6mo", "1y"];
 
 const formatXAxis = (iso: string, range: ChartRange, spanMs: number): string => {
   const d = new Date(iso);
 
-  // If points are all in a short span, show time even for larger selected ranges.
-  if (spanMs <= 36 * 60 * 60 * 1000 || range === "5m" || range === "15m" || range === "60m" || range === "1d") {
+  if (range === "5m" || range === "15m" || range === "60m" || range === "1d") {
+    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  if (range === "1w") {
+    return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit" });
+  }
+
+  if (spanMs <= 36 * 60 * 60 * 1000) {
     return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   }
 
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const normalizeForRange = (ohlcv: OHLCV[], range: ChartRange) => {
+  const sorted = ohlcv
+    .map((d) => ({ time: d.time, ts: new Date(d.time).getTime(), close: d.close }))
+    .sort((a, b) => a.ts - b.ts);
+
+  if (!sorted.length) return sorted;
+
+  // For 1w and above, keep one representative point per bucket so today intraday
+  // points do not visually drown older days.
+  if (range === "1w") {
+    const byHour = new Map<string, { time: string; ts: number; close: number }>();
+    for (const p of sorted) {
+      const d = new Date(p.ts);
+      const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}-${d.getUTCHours()}`;
+      byHour.set(key, p);
+    }
+    return Array.from(byHour.values()).sort((a, b) => a.ts - b.ts);
+  }
+
+  if (LONG_DAY_RANGES.includes(range)) {
+    const byDay = new Map<string, { time: string; ts: number; close: number }>();
+    for (const p of sorted) {
+      const d = new Date(p.ts);
+      const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+      byDay.set(key, p);
+    }
+    return Array.from(byDay.values()).sort((a, b) => a.ts - b.ts);
+  }
+
+  return sorted;
 };
 
 export function MarketChartSection({
@@ -39,13 +79,7 @@ export function MarketChartSection({
   loading: boolean;
   ohlcv: OHLCV[];
 }) {
-  const chartData = ohlcv
-    .map((d) => ({
-      time: d.time,
-      ts: new Date(d.time).getTime(),
-      close: d.close,
-    }))
-    .sort((a, b) => a.ts - b.ts);
+  const chartData = normalizeForRange(ohlcv, range);
 
   const spanMs =
     chartData.length > 1
