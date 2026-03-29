@@ -54,8 +54,7 @@ app = FastAPI(
 
 ALLOWED_ORIGINS = [
     "http://localhost:3000",          # Next.js dev server
-    "https://ahmedberrada.com",       # Your portfolio
-    "https://www.ahmedberrada.com",
+    "https://marketdatapipeline.ahmedberrada.com/", # Deployed frontend
 ]
 
 app.add_middleware(
