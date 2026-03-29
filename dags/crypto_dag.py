@@ -12,9 +12,10 @@ Same 4-task pattern as stocks_dag.py:
   extract → transform → load → log_success
 """
 
+from io import StringIO
 import logging
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, "/opt/airflow")
 
@@ -44,6 +45,13 @@ dag = DAG(
 SYMBOLS = ["BTC", "ETH", "SOL", "BNB"]
 
 
+def _read_xcom_json_df(payload: str):
+    """Pandas 2.x: wrap JSON string in StringIO to avoid deprecation warnings."""
+    import pandas as pd
+
+    return pd.read_json(StringIO(payload))
+
+
 def task_extract(**context):
     from extractors.coingecko_extractor import fetch_ohlcv
     from datetime import date
@@ -68,7 +76,7 @@ def task_transform(**context):
     from transformers.ohlcv_transformer import transform
 
     raw_json = context["task_instance"].xcom_pull(task_ids="extract", key="raw_data")
-    raw_df = pd.read_json(raw_json)
+    raw_df = _read_xcom_json_df(raw_json)
     raw_df["time"] = pd.to_datetime(raw_df["time"], utc=True)
 
     clean_df, indicators_df = transform(raw_df, asset_type="crypto")
@@ -86,8 +94,8 @@ def task_load(**context):
 
     ti = context["task_instance"]
 
-    clean_df = pd.read_json(ti.xcom_pull(task_ids="transform", key="clean_data"))
-    indicators_df = pd.read_json(ti.xcom_pull(task_ids="transform", key="indicators"))
+    clean_df = _read_xcom_json_df(ti.xcom_pull(task_ids="transform", key="clean_data"))
+    indicators_df = _read_xcom_json_df(ti.xcom_pull(task_ids="transform", key="indicators"))
 
     clean_df["time"] = pd.to_datetime(clean_df["time"], utc=True)
     indicators_df["time"] = pd.to_datetime(indicators_df["time"], utc=True)
@@ -96,16 +104,30 @@ def task_load(**context):
     rows_indicators = load_indicators(indicators_df)
 
     total = rows_prices + rows_indicators
-    context["task_instance"].xcom_push(key="rows_inserted", value=total)
+    ti.xcom_push(key="rows_prices_inserted", value=rows_prices)
+    ti.xcom_push(key="rows_indicators_inserted", value=rows_indicators)
+    ti.xcom_push(key="rows_inserted", value=total)
+
+    logger.info(
+        "Loaded crypto run: %s price rows + %s indicator rows (total=%s)",
+        rows_prices,
+        rows_indicators,
+        total,
+    )
     return total
 
 
 def task_log_success(**context):
     from loaders.timescale_loader import log_pipeline_run
 
-    rows_inserted = context["task_instance"].xcom_pull(task_ids="load", key="rows_inserted") or 0
+    ti = context["task_instance"]
+    rows_inserted = ti.xcom_pull(task_ids="load", key="rows_inserted") or 0
     dag_run = context["dag_run"]
-    duration = (datetime.utcnow() - dag_run.start_date).total_seconds()
+
+    # dag_run.start_date is timezone-aware in Airflow; keep now aware as well.
+    started_at = dag_run.start_date
+    now = datetime.now(started_at.tzinfo if started_at and started_at.tzinfo else timezone.utc)
+    duration = (now - started_at).total_seconds() if started_at else None
 
     log_pipeline_run(
         dag_id="crypto_5min",
@@ -113,6 +135,8 @@ def task_log_success(**context):
         rows_inserted=rows_inserted,
         duration_seconds=duration,
     )
+
+    logger.info("Logged crypto_5min success (rows_inserted=%s, duration=%.2fs)", rows_inserted, duration or 0.0)
 
 
 # Wire up tasks

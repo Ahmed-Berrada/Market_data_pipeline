@@ -19,10 +19,10 @@ If any task fails, Airflow marks the run as failed and can retry automatically.
 You can see all runs in the Airflow UI at http://localhost:8080.
 """
 
+from io import StringIO
 import logging
 import sys
-import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Make our modules importable from within the Airflow container
 # (Airflow mounts /opt/airflow/dags and siblings — we need to import from siblings)
@@ -32,6 +32,14 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 logger = logging.getLogger(__name__)
+
+
+def _read_xcom_json_df(payload: str):
+    """Pandas 2.x: wrap JSON string in StringIO to avoid deprecation warnings."""
+    import pandas as pd
+
+    return pd.read_json(StringIO(payload))
+
 
 # ── DAG Configuration ─────────────────────────────────────────────────────────
 # These default_args apply to every task in the DAG unless overridden
@@ -110,7 +118,7 @@ def task_transform(**context):
         task_ids="extract",
         key="raw_data",
     )
-    raw_df = pd.read_json(raw_json)
+    raw_df = _read_xcom_json_df(raw_json)
     raw_df["time"] = pd.to_datetime(raw_df["time"], utc=True)
 
     # Run the transform pipeline
@@ -142,19 +150,26 @@ def task_load(**context):
     clean_json = ti.xcom_pull(task_ids="transform", key="clean_data")
     indicators_json = ti.xcom_pull(task_ids="transform", key="indicators")
 
-    clean_df = pd.read_json(clean_json)
+    clean_df = _read_xcom_json_df(clean_json)
     clean_df["time"] = pd.to_datetime(clean_df["time"], utc=True)
 
-    indicators_df = pd.read_json(indicators_json)
+    indicators_df = _read_xcom_json_df(indicators_json)
     indicators_df["time"] = pd.to_datetime(indicators_df["time"], utc=True)
 
     rows_prices = load_stock_prices(clean_df)
     rows_indicators = load_indicators(indicators_df)
 
     total = rows_prices + rows_indicators
-    context["task_instance"].xcom_push(key="rows_inserted", value=total)
+    ti.xcom_push(key="rows_prices_inserted", value=rows_prices)
+    ti.xcom_push(key="rows_indicators_inserted", value=rows_indicators)
+    ti.xcom_push(key="rows_inserted", value=total)
 
-    logger.info(f"Loaded: {rows_prices} price rows + {rows_indicators} indicator rows")
+    logger.info(
+        "Loaded stocks run: %s price rows + %s indicator rows (total=%s)",
+        rows_prices,
+        rows_indicators,
+        total,
+    )
     return total
 
 
@@ -163,15 +178,16 @@ def task_log_success(**context):
     LOG: Record a successful run in pipeline_runs.
     Always runs last — even if the data volume was 0 (market holidays).
     """
-    import time
     from loaders.timescale_loader import log_pipeline_run
 
     ti = context["task_instance"]
     rows_inserted = ti.xcom_pull(task_ids="load", key="rows_inserted") or 0
 
-    # Calculate how long the whole pipeline took
+    # Calculate how long the whole pipeline took using timezone-aware datetimes
     dag_run = context["dag_run"]
-    duration = (datetime.utcnow() - dag_run.start_date).total_seconds()
+    started_at = dag_run.start_date
+    now = datetime.now(started_at.tzinfo if started_at and started_at.tzinfo else timezone.utc)
+    duration = (now - started_at).total_seconds() if started_at else None
 
     log_pipeline_run(
         dag_id="stocks_1min",
@@ -179,6 +195,8 @@ def task_log_success(**context):
         rows_inserted=rows_inserted,
         duration_seconds=duration,
     )
+
+    logger.info("Logged stocks_1min success (rows_inserted=%s, duration=%.2fs)", rows_inserted, duration or 0.0)
 
 
 # ── Wire up the tasks ─────────────────────────────────────────────────────────

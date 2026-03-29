@@ -168,7 +168,8 @@ def log_pipeline_run(
     """
     eng = engine or get_engine()
 
-    with eng.connect() as conn:
+    # Use an explicit transaction block for compatibility across SQLAlchemy versions.
+    with eng.begin() as conn:
         conn.execute(text("""
             INSERT INTO pipeline_runs
                 (run_at, dag_id, status, rows_inserted, error_message, duration_seconds)
@@ -182,9 +183,8 @@ def log_pipeline_run(
             "error_message": error_message,
             "duration_seconds": duration_seconds,
         })
-        conn.commit()
 
-    logger.info(f"Logged pipeline run: {dag_id} → {status} ({rows_inserted} rows)")
+    logger.info(f"Logged pipeline run: {dag_id} -> {status} ({rows_inserted} rows)")
 
 
 def get_latest_run(dag_id: Optional[str] = None, engine: Optional[Engine] = None) -> dict:
