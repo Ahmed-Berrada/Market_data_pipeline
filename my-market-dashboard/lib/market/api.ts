@@ -17,7 +17,7 @@ async function fetchJson<T>(path: string): Promise<T> {
   }
   return (await res.json()) as T;
 }
-
+// For deploy
 export async function fetchChartData(symbol: string, type: AssetType): Promise<{
   ohlcv: OhlcvResponse;
   indicators: IndicatorsResponse | null;

@@ -1,4 +1,4 @@
-export const API_BASE = "https://marketdatapipeline-production.up.railway.app";
+export const API_BASE = "https://market-data-pipeline.onrender.com";
 
 export const STOCKS = ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA", "META", "AMZN"];
 export const CRYPTOS = ["BTC", "ETH", "SOL", "BNB"];
