@@ -1,7 +1,7 @@
 """
 dags/stocks_dag.py
 ===================
-Airflow DAG — runs every weekday at 6pm UTC to fetch the day's stock data.
+Airflow DAG — runs every minute on weekdays to fetch intraday stock data.
 
 What is a DAG?
   DAG = Directed Acyclic Graph.
@@ -45,14 +45,14 @@ default_args = {
 }
 
 dag = DAG(
-    dag_id="stocks_daily",
-    description="Fetch intraday stock OHLCV for tracked stocks and load into TimescaleDB",
+    dag_id="stocks_1min",
+    description="Fetch intraday stock OHLCV every minute on weekdays and load into TimescaleDB",
     default_args=default_args,
     # Every minute, weekdays
     schedule="*/1 * * * 1-5",
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["stocks", "intraday"],
+    tags=["stocks", "intraday", "1min"],
 )
 
 # ── Symbols to track ──────────────────────────────────────────────────────────
@@ -174,7 +174,7 @@ def task_log_success(**context):
     duration = (datetime.utcnow() - dag_run.start_date).total_seconds()
 
     log_pipeline_run(
-        dag_id="stocks_daily",
+        dag_id="stocks_1min",
         status="success",
         rows_inserted=rows_inserted,
         duration_seconds=duration,

@@ -9,8 +9,8 @@ A production-style data engineering project that ingests, transforms, stores, an
 
 ## What it does
 
-- Fetches daily OHLCV data for 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, META, TSLA) via Yahoo Finance
-- Fetches hourly prices for 4 crypto assets (BTC, ETH, SOL, BNB) via CoinGecko
+- Fetches 1-minute OHLCV data for 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, META, TSLA) via Yahoo Finance
+- Fetches 5-minute prices for 4 crypto assets (BTC, ETH, SOL, BNB) via CoinGecko
 - Cleans and validates the data, computes SMA-20, SMA-50, and daily returns
 - Stores everything in TimescaleDB (PostgreSQL with time-series optimisation)
 - Schedules and orchestrates all of this with Apache Airflow
@@ -114,8 +114,8 @@ pytest tests/ -v
 
 ```
 ├── dags/                     # Airflow DAGs (scheduled jobs)
-│   ├── stocks_dag.py         # Runs weekdays at 6pm UTC
-│   └── crypto_dag.py         # Runs every hour
+│   ├── stocks_dag.py         # Runs weekdays every minute (intraday 1m)
+│   └── crypto_dag.py         # Runs every 5 minutes (24/7)
 ├── extractors/               # API fetching logic
 │   ├── yfinance_extractor.py # Yahoo Finance → DataFrame
 │   └── coingecko_extractor.py# CoinGecko → DataFrame

@@ -1,12 +1,12 @@
 """
 dags/crypto_dag.py
 ===================
-Airflow DAG — runs every hour to fetch crypto prices.
+Airflow DAG — runs every 5 minutes to fetch crypto prices.
 
-Why hourly for crypto but daily for stocks?
-  Crypto markets run 24/7. Stock markets close at 4pm ET on weekdays.
-  Fetching crypto hourly gives us more granular data and shows
-  the pipeline handles different cadences — good for the portfolio.
+Why every 5 minutes for crypto?
+  Crypto markets run 24/7. This schedule fetches data frequently enough
+  to capture market movements while demonstrating the pipeline's capability
+  to handle different cadences — good for the portfolio.
 
 Same 4-task pattern as stocks_dag.py:
   extract → transform → load → log_success
@@ -32,13 +32,13 @@ default_args = {
 }
 
 dag = DAG(
-    dag_id="crypto_hourly",
-    description="Fetch hourly crypto prices and load into TimescaleDB",
+    dag_id="crypto_5min",
+    description="Fetch crypto prices every 5 minutes and load into TimescaleDB",
     default_args=default_args,
-    schedule="*/30 * * * *",               # every 30 minutes
+    schedule="*/5 * * * *",               # every 5 minutes
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["crypto", "hourly"],
+    tags=["crypto", "5min"],
 )
 
 SYMBOLS = ["BTC", "ETH", "SOL", "BNB"]
@@ -48,7 +48,7 @@ def task_extract(**context):
     from extractors.coingecko_extractor import fetch_ohlcv
     from datetime import date
 
-    # For hourly runs we just want the last 2 days
+    # For frequent runs we just want the last 2 days
     # The ON CONFLICT DO NOTHING in the loader handles any duplicates
     end_date = date.today()
     start_date = end_date - timedelta(days=2)
@@ -108,7 +108,7 @@ def task_log_success(**context):
     duration = (datetime.utcnow() - dag_run.start_date).total_seconds()
 
     log_pipeline_run(
-        dag_id="crypto_hourly",
+        dag_id="crypto_5min",
         status="success",
         rows_inserted=rows_inserted,
         duration_seconds=duration,

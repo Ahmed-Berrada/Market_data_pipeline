@@ -22,12 +22,28 @@ def get_pipeline_status():
         engine = get_engine()
         with engine.connect() as conn:
 
-            # Last run per DAG
+            # Last run per logical DAG (normalize legacy ids)
             runs = conn.execute(text("""
-                SELECT DISTINCT ON (dag_id)
-                    dag_id, run_at, status, rows_inserted, duration_seconds
-                FROM pipeline_runs
-                ORDER BY dag_id, run_at DESC
+                SELECT DISTINCT ON (normalized_dag_id)
+                    normalized_dag_id AS dag_id,
+                    run_at,
+                    status,
+                    rows_inserted,
+                    duration_seconds
+                FROM (
+                    SELECT
+                        CASE
+                            WHEN dag_id IN ('crypto_hourly', 'crypto_5min') THEN 'crypto_5min'
+                            WHEN dag_id IN ('stocks_daily', 'stocks_1min') THEN 'stocks_1min'
+                            ELSE dag_id
+                        END AS normalized_dag_id,
+                        run_at,
+                        status,
+                        rows_inserted,
+                        duration_seconds
+                    FROM pipeline_runs
+                ) r
+                ORDER BY normalized_dag_id, run_at DESC
             """)).fetchall()
 
             # Row counts per table

@@ -11,12 +11,12 @@ export function PipelineSection({ pipeline }: { pipeline: PipelineStatus | null 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
         {[
           {
-            id: "stocks_daily",
-            schedule: "Weekdays · 18:00 UTC",
+            id: "stocks_1min",
+            schedule: "Weekdays · every minute",
             symbols: STOCKS,
-            source: "Yahoo Finance · yfinance",
+            source: "Yahoo Finance · yfinance (1m interval)",
             steps: [
-              "Extract OHLCV via yfinance",
+              "Extract 1m OHLCV via yfinance",
               "Validate + clean rows",
               "Compute SMA-20/50, daily return",
               "INSERT ON CONFLICT DO NOTHING",
@@ -25,8 +25,8 @@ export function PipelineSection({ pipeline }: { pipeline: PipelineStatus | null 
             color: "var(--accent)",
           },
           {
-            id: "crypto_hourly",
-            schedule: "Every hour · :00",
+            id: "crypto_5min",
+            schedule: "24/7 · every 5 minutes",
             symbols: CRYPTOS,
             source: "CoinGecko public API",
             steps: [
