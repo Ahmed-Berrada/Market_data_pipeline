@@ -34,7 +34,18 @@ const rangeToLimit: Record<ChartRange, number> = {
   "1y": 20000,
 };
 
-const fromForRange = (range: ChartRange): string => new Date(Date.now() - rangeToMs[range]).toISOString();
+const DAY_OR_MORE: ChartRange[] = ["1d", "1w", "1mo", "3mo", "6mo", "1y"];
+
+const fromForRange = (range: ChartRange): string => {
+  const d = new Date(Date.now() - rangeToMs[range]);
+
+  // For longer ranges, start at day boundary so we don't cut off daily candles.
+  if (DAY_OR_MORE.includes(range)) {
+    d.setUTCHours(0, 0, 0, 0);
+  }
+
+  return d.toISOString();
+};
 
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
