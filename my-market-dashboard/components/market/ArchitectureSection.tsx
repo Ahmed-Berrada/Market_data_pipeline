@@ -2,10 +2,10 @@ import { SectionLabel } from "@/components/market/Primitives";
 
 export function ArchitectureSection() {
   return (
-    <div style={{ marginBottom: 48 }}>
+    <div style={{ marginBottom: "clamp(32px, 8vw, 48px)" }}>
       <SectionLabel>System Architecture · ETL Flow</SectionLabel>
-      <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "28px 24px" }}>
-        <svg width="100%" viewBox="0 0 860 160" style={{ overflow: "visible", marginBottom: 24 }}>
+      <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "clamp(16px, 3vw, 28px)" }}>
+        <svg width="100%" viewBox="0 0 860 160" style={{ overflow: "visible", marginBottom: 24, minHeight: "auto" }}>
           <defs>
             <marker id="arr2" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
               <path d="M1 1L6 4L1 7" fill="none" stroke="var(--accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity=".5" />
@@ -71,7 +71,7 @@ export function ArchitectureSection() {
           </text>
         </svg>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "clamp(8px, 2vw, 10px)" }}>
           {[
             {
               step: "01 · EXTRACT",
@@ -90,10 +90,10 @@ export function ArchitectureSection() {
             },
           ].map((b, i) => (
             <div key={i} style={{ borderLeft: `2px solid ${b.color}`, paddingLeft: 14, paddingTop: 2, opacity: 0.85 }}>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.15em", color: b.color, marginBottom: 6 }}>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", letterSpacing: "0.15em", color: b.color, marginBottom: 6 }}>
                 {b.step}
               </div>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-muted)", lineHeight: 1.7 }}>{b.desc}</p>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(9px, 2vw, 10px)", color: "var(--text-muted)", lineHeight: 1.7 }}>{b.desc}</p>
             </div>
           ))}
         </div>

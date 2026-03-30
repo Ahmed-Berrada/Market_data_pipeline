@@ -5,7 +5,7 @@ export function SectionLabel({ children }: { children: ReactNode }) {
     <div
       style={{
         fontFamily: "var(--font-mono)",
-        fontSize: 9,
+        fontSize: "clamp(8px, 2vw, 9px)",
         letterSpacing: "0.25em",
         color: "var(--text-muted)",
         textTransform: "uppercase",
@@ -31,15 +31,16 @@ export function Tab({
       onClick={onClick}
       style={{
         fontFamily: "var(--font-mono)",
-        fontSize: 10,
+        fontSize: "clamp(8px, 1.5vw, 10px)",
         letterSpacing: "0.15em",
-        padding: "5px 14px",
+        padding: "clamp(4px, 1vw, 5px) clamp(10px, 2vw, 14px)",
         border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
         color: active ? "var(--accent)" : "var(--text-muted)",
         background: active ? "var(--accent-dim)" : "transparent",
         cursor: "pointer",
         transition: "all .2s",
         textTransform: "uppercase",
+        whiteSpace: "nowrap",
       }}
     >
       {children}

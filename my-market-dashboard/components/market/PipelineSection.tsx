@@ -5,10 +5,10 @@ import type { PipelineStatus } from "@/types/market";
 
 export function PipelineSection({ pipeline }: { pipeline: PipelineStatus | null }) {
   return (
-    <div style={{ marginBottom: 48 }}>
+    <div style={{ marginBottom: "clamp(32px, 8vw, 48px)" }}>
       <SectionLabel>Pipeline · Airflow DAGs</SectionLabel>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "clamp(8px, 3vw, 12px)", marginBottom: 24 }}>
         {[
           {
             id: "stocks_1min",
@@ -39,36 +39,37 @@ export function PipelineSection({ pipeline }: { pipeline: PipelineStatus | null 
             color: "var(--navy-light)",
           },
         ].map((dag) => (
-          <div key={dag.id} style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "22px 24px" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+          <div key={dag.id} style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "clamp(16px, 3vw, 22px) clamp(16px, 3vw, 24px)" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, gap: 8, flexWrap: "wrap" }}>
               <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: dag.color, fontWeight: 500, marginBottom: 4 }}>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(11px, 2vw, 12px)", color: dag.color, fontWeight: 500, marginBottom: 4 }}>
                   {dag.id}
                 </div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-muted)", letterSpacing: "0.1em" }}>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)", letterSpacing: "0.1em" }}>
                   {dag.schedule}
                 </div>
               </div>
               <div
                 style={{
                   fontFamily: "var(--font-mono)",
-                  fontSize: 8,
+                  fontSize: "clamp(7px, 1.5vw, 8px)",
                   letterSpacing: "0.15em",
                   color: dag.color,
                   border: `1px solid ${dag.color}`,
                   padding: "2px 7px",
                   opacity: 0.7,
+                  whiteSpace: "nowrap",
                 }}
               >
                 ACTIVE
               </div>
             </div>
 
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-muted)", marginBottom: 12 }}>{dag.source}</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)", marginBottom: 12 }}>{dag.source}</div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
               {dag.steps.map((step, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                   <div
                     style={{
                       width: 16,
@@ -81,18 +82,19 @@ export function PipelineSection({ pipeline }: { pipeline: PipelineStatus | null 
                       fontSize: 8,
                       color: dag.color,
                       flexShrink: 0,
+                      marginTop: 2,
                     }}
                   >
                     {i + 1}
                   </div>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-dim)" }}>{step}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 10px)", color: "var(--text-dim)" }}>{step}</span>
                 </div>
               ))}
             </div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
               {dag.symbols.map((s) => (
-                <span key={s} style={{ fontFamily: "var(--font-mono)", fontSize: 8, padding: "2px 6px", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                <span key={s} style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(7px, 1.5vw, 8px)", padding: "2px 6px", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
                   {s}
                 </span>
               ))}
@@ -101,10 +103,10 @@ export function PipelineSection({ pipeline }: { pipeline: PipelineStatus | null 
         ))}
       </div>
 
-      <div style={{ border: "1px solid var(--border)", background: "var(--bg-2)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "10px 18px", borderBottom: "1px solid var(--border)" }}>
+      <div style={{ border: "1px solid var(--border)", background: "var(--bg-2)", overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "10px 18px", borderBottom: "1px solid var(--border)", minWidth: "500px" }}>
           {["DAG", "LAST RUN", "STATUS", "ROWS INSERTED", "DURATION"].map((h) => (
-            <span key={h} style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.2em", color: "var(--text-muted)" }}>
+            <span key={h} style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(7px, 1.5vw, 8px)", letterSpacing: "0.2em", color: "var(--text-muted)" }}>
               {h}
             </span>
           ))}
@@ -120,25 +122,26 @@ export function PipelineSection({ pipeline }: { pipeline: PipelineStatus | null 
                 padding: "10px 18px",
                 borderBottom: "1px solid var(--border)",
                 transition: "background .15s",
+                minWidth: "500px",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-3)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent)" }}>{p.dag_id}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)" }}>{ago(p.last_run)}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: p.status === "success" ? "#4ade80" : "#ef4444" }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(10px, 2vw, 11px)", color: "var(--accent)" }}>{p.dag_id}</span>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(10px, 2vw, 11px)", color: "var(--text-dim)" }}>{ago(p.last_run)}</span>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(10px, 2vw, 11px)", color: p.status === "success" ? "#4ade80" : "#ef4444" }}>
                 {p.status.toUpperCase()}
               </span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)" }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(10px, 2vw, 11px)", color: "var(--text-dim)" }}>
                 {p.rows_inserted?.toLocaleString()}
               </span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)" }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(10px, 2vw, 11px)", color: "var(--text-dim)" }}>
                 {p.duration_seconds?.toFixed(1)}s
               </span>
             </div>
           ))
         ) : (
-          <div style={{ padding: "24px 18px", fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-muted)", letterSpacing: "0.15em", textAlign: "center" }}>
+          <div style={{ padding: "24px 18px", fontFamily: "var(--font-mono)", fontSize: "clamp(9px, 2vw, 10px)", color: "var(--text-muted)", letterSpacing: "0.15em", textAlign: "center" }}>
             NO RUNS RECORDED YET
           </div>
         )}
@@ -146,4 +149,3 @@ export function PipelineSection({ pipeline }: { pipeline: PipelineStatus | null 
     </div>
   );
 }
-

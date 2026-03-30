@@ -7,7 +7,7 @@ export function DashboardNav({ lastRun }: { lastRun?: string }) {
     <nav
       style={{
         borderBottom: "1px solid var(--border)",
-        padding: "14px 32px",
+        padding: "clamp(10px, 3vw, 14px) clamp(12px, 5vw, 32px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -15,17 +15,20 @@ export function DashboardNav({ lastRun }: { lastRun?: string }) {
         position: "sticky",
         top: 0,
         zIndex: 50,
+        gap: 12,
+        flexWrap: "wrap",
       }}
     >
       <a
         href="https://ahmedberrada.com"
         style={{
           fontFamily: "var(--font-mono)",
-          fontSize: 10,
+          fontSize: "clamp(8px, 2vw, 10px)",
           letterSpacing: "0.2em",
           color: "var(--text-muted)",
           textDecoration: "none",
           transition: "color .2s",
+          whiteSpace: "nowrap",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
         onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
@@ -33,7 +36,7 @@ export function DashboardNav({ lastRun }: { lastRun?: string }) {
         ← AHMED BERRADA
       </a>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em", color: "var(--text-muted)" }}>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", letterSpacing: "0.2em", color: "var(--text-muted)" }}>
           {lastRun ? `UPDATED ${ago(lastRun).toUpperCase()}` : "MARKET DATA PIPELINE"}
         </span>
       </div>
@@ -43,11 +46,11 @@ export function DashboardNav({ lastRun }: { lastRun?: string }) {
 
 export function HeroSection() {
   return (
-    <div style={{ marginBottom: 56 }}>
+    <div style={{ marginBottom: "clamp(32px, 8vw, 56px)" }}>
       <div
         style={{
           fontFamily: "var(--font-mono)",
-          fontSize: 9,
+          fontSize: "clamp(7px, 2vw, 9px)",
           letterSpacing: "0.25em",
           color: "var(--text-muted)",
           marginBottom: 20,
@@ -59,7 +62,7 @@ export function HeroSection() {
       <h1
         style={{
           fontFamily: "var(--font-display)",
-          fontSize: "clamp(40px,6vw,72px)",
+          fontSize: "clamp(32px, 8vw, 72px)",
           fontWeight: 400,
           lineHeight: 1,
           color: "var(--text)",
@@ -73,7 +76,7 @@ export function HeroSection() {
       <p
         style={{
           fontFamily: "var(--font-mono)",
-          fontSize: 12,
+          fontSize: "clamp(10px, 2.5vw, 12px)",
           color: "var(--text-muted)",
           maxWidth: 560,
           lineHeight: 1.8,
@@ -89,7 +92,7 @@ export function HeroSection() {
             key={t}
             style={{
               fontFamily: "var(--font-mono)",
-              fontSize: 9,
+              fontSize: "clamp(7px, 2vw, 9px)",
               letterSpacing: "0.12em",
               padding: "4px 10px",
               border: "1px solid var(--border)",
@@ -109,7 +112,7 @@ export function StatsGrid({ pipeline }: { pipeline: PipelineStatus | null }) {
   const lastRun = pipeline?.pipelines?.[0]?.last_run;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 48 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "clamp(8px, 3vw, 12px)", marginBottom: "clamp(32px, 8vw, 48px)" }}>
       {[
         { label: "DATA SOURCES", value: "2", sub: "Yahoo Finance + CoinGecko" },
         { label: "ASSETS TRACKED", value: "11", sub: "7 stocks · 4 crypto" },
@@ -120,11 +123,11 @@ export function StatsGrid({ pipeline }: { pipeline: PipelineStatus | null }) {
           sub: lastRun ? ago(lastRun) : "Airflow DAGs",
         },
       ].map((s, i) => (
-        <div key={i} style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "20px 22px" }}>
+        <div key={i} style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "clamp(14px, 3vw, 20px)" }}>
           <div
             style={{
               fontFamily: "var(--font-mono)",
-              fontSize: 8,
+              fontSize: "clamp(7px, 1.5vw, 8px)",
               letterSpacing: "0.22em",
               color: "var(--text-muted)",
               marginBottom: 10,
@@ -135,7 +138,7 @@ export function StatsGrid({ pipeline }: { pipeline: PipelineStatus | null }) {
           <div
             style={{
               fontFamily: "var(--font-mono)",
-              fontSize: 28,
+              fontSize: "clamp(20px, 5vw, 28px)",
               color: "var(--accent)",
               fontWeight: 300,
               lineHeight: 1,
@@ -144,7 +147,7 @@ export function StatsGrid({ pipeline }: { pipeline: PipelineStatus | null }) {
           >
             {s.value}
           </div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-muted)" }}>{s.sub}</div>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 1.5vw, 9px)", color: "var(--text-muted)" }}>{s.sub}</div>
         </div>
       ))}
     </div>

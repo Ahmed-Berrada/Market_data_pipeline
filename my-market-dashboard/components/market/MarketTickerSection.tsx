@@ -13,9 +13,9 @@ export function MarketTickerSection({
   onSelect: (symbol: string, type: AssetType) => void;
 }) {
   return (
-    <div style={{ marginBottom: 48 }}>
+    <div style={{ marginBottom: "clamp(32px, 8vw, 48px)" }}>
       <SectionLabel>Equities · Click to chart</SectionLabel>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 8, marginBottom: 16, position: "relative" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))", gap: "clamp(6px, 2vw, 8px)", marginBottom: 16, position: "relative" }}>
         {STOCKS.map((s) => (
           <div key={s} style={{ position: "relative" }}>
             <TickerCard symbol={s} latest={latests[s] ?? null} onClick={() => onSelect(s, "stock")} active={symbol === s} />
@@ -24,7 +24,7 @@ export function MarketTickerSection({
       </div>
 
       <SectionLabel>Crypto · Click to chart</SectionLabel>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))", gap: "clamp(6px, 2vw, 8px)" }}>
         {CRYPTOS.map((s) => (
           <div key={s} style={{ position: "relative" }}>
             <TickerCard symbol={s} latest={latests[s] ?? null} onClick={() => onSelect(s, "crypto")} active={symbol === s} />

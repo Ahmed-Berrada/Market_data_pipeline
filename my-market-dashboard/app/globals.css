@@ -33,6 +33,14 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
+
+/* Mobile-first responsive utilities */
+@media (max-width: 768px) {
+  html { font-size: 14px; }
+}
+@media (max-width: 480px) {
+  html { font-size: 13px; }
+}
 ::selection { background: var(--accent); color: #000; }
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg); }

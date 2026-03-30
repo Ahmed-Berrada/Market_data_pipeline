@@ -31,7 +31,7 @@ export default function PipelineDashboard() {
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-body)" }}>
       <DashboardNav lastRun={lastRun} />
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "48px 32px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "clamp(24px, 5vw, 48px) clamp(16px, 5vw, 32px)" }}>
         <HeroSection />
         <StatsGrid pipeline={pipeline} />
 

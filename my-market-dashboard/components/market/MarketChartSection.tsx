@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -79,6 +80,21 @@ export function MarketChartSection({
   loading: boolean;
   ohlcv: OHLCV[];
 }) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Set initial state
+    setIsMobile(typeof window !== "undefined" && window.innerWidth < 768);
+
+    // Handle window resize
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const chartData = normalizeForRange(ohlcv, range);
 
   const spanMs =
@@ -86,13 +102,22 @@ export function MarketChartSection({
       ? chartData[chartData.length - 1].ts - chartData[0].ts
       : 0;
 
+  const chartHeight = isMobile ? 200 : 260;
+  const chartMarginLeft = isMobile ? 24 : 32;
+  const chartMarginRight = isMobile ? 8 : 8;
+  const xAxisFontSize = isMobile ? 7 : 9;
+  const xAxisMinTickGap = isMobile ? 24 : 18;
+  const yAxisFontSize = isMobile ? 7 : 9;
+  const yAxisWidth = isMobile ? 30 : 40;
+  const yAxisDecimalPlaces = isMobile ? 0 : 2;
+
   return (
-    <div style={{ marginBottom: 48 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+    <div style={{ marginBottom: "clamp(32px, 8vw, 48px)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: "clamp(8px, 2vw, 12px)" }}>
         <SectionLabel>
           {symbol} · {range.toUpperCase()} · {assetType === "stock" ? "Yahoo Finance" : "CoinGecko"}
         </SectionLabel>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "clamp(4px, 1.5vw, 6px)", flexWrap: "wrap" }}>
           {RANGE_OPTIONS.map((opt) => (
             <Tab key={opt} active={range === opt} onClick={() => setRange(opt)}>
               {opt}
@@ -101,7 +126,7 @@ export function MarketChartSection({
         </div>
       </div>
 
-      <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "20px", minHeight: 280, position: "relative" }}>
+      <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "clamp(14px, 3vw, 20px)", minHeight: "clamp(200px, 60vh, 300px)", position: "relative" }}>
         {loading && (
           <div
             style={{
@@ -111,7 +136,7 @@ export function MarketChartSection({
               alignItems: "center",
               justifyContent: "center",
               fontFamily: "var(--font-mono)",
-              fontSize: 10,
+              fontSize: "clamp(9px, 2vw, 10px)",
               letterSpacing: "0.3em",
               color: "var(--text-muted)",
             }}
@@ -123,14 +148,16 @@ export function MarketChartSection({
         {!loading && chartData.length === 0 && (
           <div
             style={{
-              height: 240,
+              height: "clamp(160px, 50vh, 240px)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontFamily: "var(--font-mono)",
-              fontSize: 10,
+              fontSize: "clamp(8px, 2vw, 10px)",
               letterSpacing: "0.15em",
               color: "var(--text-muted)",
+              textAlign: "center",
+              padding: 12,
             }}
           >
             NO DATA AVAILABLE FOR THIS RANGE
@@ -138,22 +165,23 @@ export function MarketChartSection({
         )}
 
         {!loading && chartData.length > 0 && (
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 32 }}>
+          <ResponsiveContainer width="100%" height={chartHeight}>
+            <LineChart data={chartData} margin={{ top: 8, right: chartMarginRight, bottom: 8, left: chartMarginLeft }}>
               <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
               <XAxis
                 dataKey="time"
                 tickFormatter={(iso) => formatXAxis(String(iso), range, spanMs)}
-                tick={{ fontFamily: "var(--font-mono)", fontSize: 9, fill: "var(--text-muted)" }}
+                tick={{ fontFamily: "var(--font-mono)", fontSize: xAxisFontSize, fill: "var(--text-muted)" }}
                 tickLine={false}
                 axisLine={{ stroke: "var(--border)" }}
-                minTickGap={18}
+                minTickGap={xAxisMinTickGap}
               />
               <YAxis
-                tick={{ fontFamily: "var(--font-mono)", fontSize: 9, fill: "var(--text-muted)" }}
+                tick={{ fontFamily: "var(--font-mono)", fontSize: yAxisFontSize, fill: "var(--text-muted)" }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(2))}
+                tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(yAxisDecimalPlaces))}
+                width={yAxisWidth}
               />
               <Tooltip content={<ChartTooltip />} labelFormatter={(_, payload) => payload?.[0]?.payload?.time ?? ""} />
               <Line type="monotone" dataKey="close" name="close" stroke="var(--accent)" dot={false} strokeWidth={1.7} />
@@ -162,14 +190,14 @@ export function MarketChartSection({
         )}
 
         {!loading && chartData.length > 0 && (
-          <div style={{ display: "flex", gap: 20, marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", gap: "clamp(12px, 4vw, 20px)", marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{ width: 20, height: 1.5, background: "var(--accent)" }} />
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-muted)" }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)" }}>
                 Close price (hover to inspect exact value)
               </span>
             </div>
-            <div style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-muted)" }}>
+            <div style={{ marginLeft: isMobile ? 0 : "auto", fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)" }}>
               {assetType === "stock" ? "SOURCE · YAHOO FINANCE" : "SOURCE · COINGECKO"}
             </div>
           </div>

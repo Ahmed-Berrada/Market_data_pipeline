@@ -2,9 +2,9 @@ import { SectionLabel } from "@/components/market/Primitives";
 
 export function LearnedSection() {
   return (
-    <div style={{ marginBottom: 48 }}>
+    <div style={{ marginBottom: "clamp(32px, 8vw, 48px)" }}>
       <SectionLabel>What I Learned</SectionLabel>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "clamp(8px, 3vw, 12px)" }}>
         {[
           {
             title: "DAGs & orchestration",
@@ -24,10 +24,10 @@ export function LearnedSection() {
           },
         ].map((l, i) => (
           <div key={i} style={{ borderLeft: "2px solid var(--border-2)", paddingLeft: 16, paddingTop: 2 }}>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-dim)", marginBottom: 6, fontWeight: 500 }}>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(9px, 2vw, 10px)", color: "var(--text-dim)", marginBottom: 6, fontWeight: 500 }}>
               {l.title}
             </div>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-muted)", lineHeight: 1.7 }}>{l.body}</p>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(9px, 2vw, 10px)", color: "var(--text-muted)", lineHeight: 1.7 }}>{l.body}</p>
           </div>
         ))}
       </div>
@@ -37,23 +37,24 @@ export function LearnedSection() {
 
 export function DashboardFooter() {
   return (
-    <div style={{ borderTop: "1px solid var(--border)", paddingTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ borderTop: "1px solid var(--border)", paddingTop: "clamp(16px, 4vw, 24px)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
       <a
         href="https://ahmedberrada.com"
         style={{
           fontFamily: "var(--font-mono)",
-          fontSize: 9,
+          fontSize: "clamp(8px, 2vw, 9px)",
           letterSpacing: "0.2em",
           color: "var(--text-muted)",
           textDecoration: "none",
           transition: "color .2s",
+          whiteSpace: "nowrap",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
         onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
       >
         ← BACK TO PORTFOLIO
       </a>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.15em", color: "var(--border-2)" }}>
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", letterSpacing: "0.15em", color: "var(--border-2)" }}>
         AHMED BERRADA · 2026
       </span>
     </div>
