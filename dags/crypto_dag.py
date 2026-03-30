@@ -1,12 +1,12 @@
 """
 dags/crypto_dag.py
 ===================
-Airflow DAG — runs every 5 minutes to fetch crypto prices.
+Airflow DAG — runs every 20 minutes to fetch crypto prices.
 
-Why every 5 minutes for crypto?
-  Crypto markets run 24/7. This schedule fetches data frequently enough
-  to capture market movements while demonstrating the pipeline's capability
-  to handle different cadences — good for the portfolio.
+Why every 20 minutes for crypto?
+  The CoinGecko demo API key is capped at 10,000 calls/month.
+  At 4 symbols and one API call per run, every-20-min gives ~8,640 calls/month
+  which stays safely under the limit while still capturing meaningful movements.
 
 Same 4-task pattern as stocks_dag.py:
   extract → transform → load → log_success
@@ -36,7 +36,7 @@ dag = DAG(
     dag_id="crypto_5min",
     description="Fetch crypto prices every 5 minutes and load into TimescaleDB",
     default_args=default_args,
-    schedule="*/5 * * * *",               # every 5 minutes
+    schedule="*/20 * * * *",              # every 20 minutes (CoinGecko 10k/month budget)
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["crypto", "5min"],

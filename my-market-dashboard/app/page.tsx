@@ -18,7 +18,7 @@ export default function PipelineDashboard() {
   const [assetType, setAssetType] = useState<AssetType>("stock");
   const [range, setRange] = useState<ChartRange>("1y");
 
-  const { ohlcv, latests, pipeline, loading } = useMarketDashboard(symbol, assetType, range);
+  const { ohlcv, indicators, latests, pipeline, loading } = useMarketDashboard(symbol, assetType, range);
 
   const lastRun = pipeline?.pipelines?.[0]?.last_run;
 
@@ -44,6 +44,7 @@ export default function PipelineDashboard() {
           setRange={setRange}
           loading={loading}
           ohlcv={ohlcv}
+          indicators={indicators}
         />
 
         <PipelineSection pipeline={pipeline} />

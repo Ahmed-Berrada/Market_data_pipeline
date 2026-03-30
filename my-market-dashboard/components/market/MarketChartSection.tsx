@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { ChartTooltip } from "@/components/market/ChartParts";
 import { SectionLabel, Tab } from "@/components/market/Primitives";
-import type { AssetType, ChartRange, OHLCV } from "@/types/market";
+import type { AssetType, ChartRange, Indicator, OHLCV } from "@/types/market";
 
 const RANGE_OPTIONS: ChartRange[] = ["5m", "15m", "60m", "1d", "1w", "1mo", "3mo", "6mo", "1y"];
 const LONG_DAY_RANGES: ChartRange[] = ["1mo", "3mo", "6mo", "1y"];
@@ -33,17 +33,43 @@ const formatXAxis = (iso: string, range: ChartRange, spanMs: number): string => 
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
-const normalizeForRange = (ohlcv: OHLCV[], range: ChartRange) => {
-  const sorted = ohlcv
-    .map((d) => ({ time: d.time, ts: new Date(d.time).getTime(), close: d.close }))
+// Returns UTC date string "YYYY-MM-DD" for a given ISO timestamp
+const toDateKey = (iso: string) => iso.slice(0, 10);
+
+type ChartPoint = {
+  time: string;
+  ts: number;
+  close: number;
+  sma_20?: number | null;
+  sma_50?: number | null;
+  daily_return?: number | null;
+};
+
+const buildChartData = (ohlcv: OHLCV[], indicators: Indicator[], range: ChartRange): ChartPoint[] => {
+  // Build a lookup: date string → latest indicator for that day
+  const indByDate = new Map<string, Indicator>();
+  for (const ind of indicators) {
+    indByDate.set(toDateKey(ind.time), ind);
+  }
+
+  const sorted: ChartPoint[] = ohlcv
+    .map((d) => {
+      const ind = indByDate.get(toDateKey(d.time));
+      return {
+        time: d.time,
+        ts: new Date(d.time).getTime(),
+        close: d.close,
+        sma_20: ind?.sma_20 ?? null,
+        sma_50: ind?.sma_50 ?? null,
+        daily_return: ind?.daily_return ?? null,
+      };
+    })
     .sort((a, b) => a.ts - b.ts);
 
   if (!sorted.length) return sorted;
 
-  // For 1w and above, keep one representative point per bucket so today intraday
-  // points do not visually drown older days.
   if (range === "1w") {
-    const byHour = new Map<string, { time: string; ts: number; close: number }>();
+    const byHour = new Map<string, ChartPoint>();
     for (const p of sorted) {
       const d = new Date(p.ts);
       const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}-${d.getUTCHours()}`;
@@ -53,7 +79,7 @@ const normalizeForRange = (ohlcv: OHLCV[], range: ChartRange) => {
   }
 
   if (LONG_DAY_RANGES.includes(range)) {
-    const byDay = new Map<string, { time: string; ts: number; close: number }>();
+    const byDay = new Map<string, ChartPoint>();
     for (const p of sorted) {
       const d = new Date(p.ts);
       const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
@@ -72,6 +98,7 @@ export function MarketChartSection({
   setRange,
   loading,
   ohlcv,
+  indicators,
 }: {
   symbol: string;
   assetType: AssetType;
@@ -79,28 +106,27 @@ export function MarketChartSection({
   setRange: (range: ChartRange) => void;
   loading: boolean;
   ohlcv: OHLCV[];
+  indicators: Indicator[];
 }) {
   const [isMobile, setIsMobile] = useState(false);
+  const [showSma20, setShowSma20] = useState(true);
+  const [showSma50, setShowSma50] = useState(true);
 
   useEffect(() => {
-    // Set initial state
     setIsMobile(typeof window !== "undefined" && window.innerWidth < 768);
-
-    // Handle window resize
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const chartData = normalizeForRange(ohlcv, range);
+  const chartData = buildChartData(ohlcv, indicators, range);
 
   const spanMs =
     chartData.length > 1
       ? chartData[chartData.length - 1].ts - chartData[0].ts
       : 0;
+
+  const hasSma = chartData.some((d) => d.sma_20 != null || d.sma_50 != null);
 
   const chartHeight = isMobile ? 200 : 260;
   const chartMarginLeft = isMobile ? 24 : 32;
@@ -125,6 +151,18 @@ export function MarketChartSection({
           ))}
         </div>
       </div>
+
+      {/* SMA toggles — only shown when indicator data is available */}
+      {hasSma && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+          <Tab active={showSma20} onClick={() => setShowSma20((v) => !v)}>
+            SMA 20
+          </Tab>
+          <Tab active={showSma50} onClick={() => setShowSma50((v) => !v)}>
+            SMA 50
+          </Tab>
+        </div>
+      )}
 
       <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "clamp(14px, 3vw, 20px)", minHeight: "clamp(200px, 60vh, 300px)", position: "relative" }}>
         {loading && (
@@ -185,18 +223,34 @@ export function MarketChartSection({
               />
               <Tooltip content={<ChartTooltip />} labelFormatter={(_, payload) => payload?.[0]?.payload?.time ?? ""} />
               <Line type="monotone" dataKey="close" name="close" stroke="var(--accent)" dot={false} strokeWidth={1.7} />
+              {showSma20 && (
+                <Line type="monotone" dataKey="sma_20" name="SMA 20" stroke="#f59e0b" dot={false} strokeWidth={1.2} strokeDasharray="4 2" connectNulls />
+              )}
+              {showSma50 && (
+                <Line type="monotone" dataKey="sma_50" name="SMA 50" stroke="#a78bfa" dot={false} strokeWidth={1.2} strokeDasharray="4 2" connectNulls />
+              )}
             </LineChart>
           </ResponsiveContainer>
         )}
 
         {!loading && chartData.length > 0 && (
-          <div style={{ display: "flex", gap: "clamp(12px, 4vw, 20px)", marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
+          <div style={{ display: "flex", gap: "clamp(12px, 4vw, 20px)", marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{ width: 20, height: 1.5, background: "var(--accent)" }} />
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)" }}>
-                Close price (hover to inspect exact value)
-              </span>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)" }}>Close</span>
             </div>
+            {hasSma && showSma20 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 20, height: 1.5, background: "#f59e0b" }} />
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)" }}>SMA 20d</span>
+              </div>
+            )}
+            {hasSma && showSma50 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 20, height: 1.5, background: "#a78bfa" }} />
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)" }}>SMA 50d</span>
+              </div>
+            )}
             <div style={{ marginLeft: isMobile ? 0 : "auto", fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)" }}>
               {assetType === "stock" ? "SOURCE · YAHOO FINANCE" : "SOURCE · COINGECKO"}
             </div>

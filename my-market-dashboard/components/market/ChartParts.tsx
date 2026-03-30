@@ -2,8 +2,39 @@ import { useRef } from "react";
 import { fmt } from "@/lib/market/format";
 import type { OHLCV } from "@/types/market";
 
-export function ChartTooltip({ active, payload, label }: any) {
+const formatTooltipTime = (iso: string): string => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+    timeZoneName: "short",
+  });
+};
+
+const formatTooltipValue = (name: string, value: number): string => {
+  if (name === "daily_return") {
+    const sign = value >= 0 ? "+" : "";
+    return `${sign}${(value * 100).toFixed(2)}%`;
+  }
+  return fmt(value);
+};
+
+export function ChartTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
+
+  // daily_return lives on the same data point as close — pull it from the first payload item
+  const raw = payload[0]?.payload;
+  const dailyReturn: number | null = raw?.daily_return ?? null;
+
+  // Filter out sma/return lines that have no value at this point
+  const priceLines = payload.filter(
+    (p: any) => p.dataKey !== "daily_return" && p.value != null
+  );
 
   return (
     <div
@@ -13,21 +44,26 @@ export function ChartTooltip({ active, payload, label }: any) {
         padding: "10px 14px",
         fontFamily: "var(--font-mono)",
         fontSize: 11,
+        minWidth: 160,
       }}
     >
-      <div style={{ color: "var(--text-dim)", marginBottom: 6 }}>{label}</div>
-      {payload.map((p: any, i: number) => (
-        <div key={i} style={{ color: p.color, marginBottom: 2 }}>
-          {p.name}:{" "}
-          <span style={{ color: "var(--text)" }}>
-            {typeof p.value === "number"
-              ? p.name === "daily_return"
-                ? `${p.value.toFixed(3)}%`
-                : fmt(p.value)
-              : p.value}
-          </span>
+      <div style={{ color: "var(--text-muted)", marginBottom: 8, fontSize: 10 }}>
+        {formatTooltipTime(raw?.time ?? "")}
+      </div>
+      {priceLines.map((p: any, i: number) => (
+        <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 3 }}>
+          <span style={{ color: p.color }}>{p.name}</span>
+          <span style={{ color: "var(--text)" }}>{formatTooltipValue(p.name, p.value)}</span>
         </div>
       ))}
+      {dailyReturn != null && (
+        <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: "var(--text-muted)" }}>daily ret.</span>
+          <span style={{ color: dailyReturn >= 0 ? "var(--accent)" : "#ef4444" }}>
+            {dailyReturn >= 0 ? "+" : ""}{(dailyReturn * 100).toFixed(2)}%
+          </span>
+        </div>
+      )}
     </div>
   );
 }

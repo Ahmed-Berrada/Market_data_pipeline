@@ -119,33 +119,44 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
 
 def _compute_indicators(df: pd.DataFrame, asset_type: str) -> pd.DataFrame:
     """
-    Compute per-symbol technical indicators.
+    Compute per-symbol daily technical indicators.
 
-    We use pandas groupby to process each symbol independently —
-    important because a 20-day SMA should never mix data from AAPL and MSFT.
+    Regardless of the intraday resolution of the raw data (5-min stocks,
+    20-min crypto), indicators are always computed on **daily closes**:
+      - SMA-20 = 20-day simple moving average of daily close
+      - SMA-50 = 50-day simple moving average of daily close
+      - daily_return = (today's close - yesterday's close) / yesterday's close
+
+    We resample to daily first so that SMA-20 always means "20 trading days",
+    not "20 bars", which would be meaningless at intraday resolution.
     """
     results = []
 
     for symbol, group in df.groupby("symbol"):
         group = group.sort_values("time").copy()
+        group = group.set_index("time")
 
-        # SMA-20: rolling average of last 20 closing prices
-        # min_periods=1 means we start computing even before we have 20 bars
-        group["sma_20"] = group["close"].rolling(window=20, min_periods=1).mean()
+        # Resample to daily: last close of each day, sum of volumes.
+        # label="left" puts the timestamp at the start of the day (midnight UTC).
+        daily = group["close"].resample("1D").last().dropna()
 
-        # SMA-50
-        group["sma_50"] = group["close"].rolling(window=50, min_periods=1).mean()
+        if daily.empty:
+            continue
 
-        # Daily return: percentage change from previous close
-        # .pct_change() handles the (today - yesterday) / yesterday formula
-        group["daily_return"] = group["close"].pct_change()
+        daily_df = daily.reset_index()
+        daily_df.columns = ["time", "close"]
 
-        # First row has no previous close, so daily_return is NaN — set to 0
-        group["daily_return"] = group["daily_return"].fillna(0)
+        # SMA-20 and SMA-50 over daily closes
+        daily_df["sma_20"] = daily_df["close"].rolling(window=20, min_periods=1).mean()
+        daily_df["sma_50"] = daily_df["close"].rolling(window=50, min_periods=1).mean()
 
-        group["asset_type"] = asset_type
+        # Day-over-day return; first row has no prior day — set to 0
+        daily_df["daily_return"] = daily_df["close"].pct_change().fillna(0)
 
-        results.append(group[["time", "symbol", "asset_type", "close", "sma_20", "sma_50", "daily_return"]])
+        daily_df["symbol"] = symbol
+        daily_df["asset_type"] = asset_type
+
+        results.append(daily_df[["time", "symbol", "asset_type", "close", "sma_20", "sma_50", "daily_return"]])
 
     if not results:
         return pd.DataFrame()
