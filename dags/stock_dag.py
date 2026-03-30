@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, "/opt/airflow")
 
 from airflow import DAG
+from airflow.exceptions import AirflowSkipException
 from airflow.operators.python import PythonOperator
 
 logger = logging.getLogger(__name__)
@@ -54,13 +55,13 @@ default_args = {
 
 dag = DAG(
     dag_id="stocks_1min",
-    description="Fetch intraday stock OHLCV every minute on weekdays and load into TimescaleDB",
+    description="Fetch intraday stock OHLCV every 5 minutes on weekdays and load into PostgreSQL",
     default_args=default_args,
-    # Every minute, weekdays
-    schedule="*/1 * * * 1-5",
+    # Every 5 minutes, weekdays (more stable for Yahoo than 1m polling)
+    schedule="*/5 * * * 1-5",
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["stocks", "intraday", "1min"],
+    tags=["stocks", "intraday", "5min"],
 )
 
 # ── Symbols to track ──────────────────────────────────────────────────────────
@@ -80,28 +81,34 @@ def task_extract(**context):
     from extractors.yfinance_extractor import fetch_ohlcv
     from datetime import date
 
-    # 1m bars are limited by Yahoo; keep a short rolling window.
-    end_date = date.today() + timedelta(days=1)
-    start_date = end_date - timedelta(days=2)
+    # Use logical_date and avoid future-day requests that frequently return empty.
+    logical_date = context.get("logical_date")
+    end_date = logical_date.astimezone(timezone.utc).date() if logical_date else date.today()
+    start_date = end_date - timedelta(days=7)
 
     df = fetch_ohlcv(
         SYMBOLS,
         start_date=start_date,
         end_date=end_date,
-        interval="1m",
+        interval="5m",
     )
 
     if df.empty:
-        raise ValueError("Extraction returned empty DataFrame — no data fetched")
+        # Market closed / Yahoo transient failures should not poison the whole DAG run.
+        raise AirflowSkipException("No stock data fetched (market closed or Yahoo unavailable)")
 
-    # Push to XCom — Airflow stores this temporarily so the next task can read it
-    # We serialize to JSON since XCom stores strings
     context["task_instance"].xcom_push(
         key="raw_data",
         value=df.to_json(date_format="iso"),
     )
 
-    logger.info(f"Extracted {len(df)} rows for {SYMBOLS}")
+    logger.info(
+        "Extracted %s rows for %s (window %s -> %s, interval=5m)",
+        len(df),
+        SYMBOLS,
+        start_date,
+        end_date,
+    )
     return len(df)
 
 

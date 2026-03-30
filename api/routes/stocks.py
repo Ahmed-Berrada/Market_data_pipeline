@@ -62,10 +62,13 @@ def get_stock_ohlcv(
         raise HTTPException(status_code=500, detail=str(e))
 
     if not rows:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No data found for {symbol} in range {from_date} to {to_date}"
-        )
+        return {
+            "symbol": symbol,
+            "from": from_date.isoformat(),
+            "to": to_date.isoformat(),
+            "count": 0,
+            "data": [],
+        }
 
     return {
         "symbol": symbol,

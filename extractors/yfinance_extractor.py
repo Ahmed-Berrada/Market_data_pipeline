@@ -17,13 +17,21 @@ This is the EXTRACT step of our ETL pipeline.
 """
 
 import logging
-from datetime import date, timedelta
+import time
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import pandas as pd
+import requests
 import yfinance as yf
 
 logger = logging.getLogger(__name__)
+
+YAHOO_CHART_BASE = "https://query2.finance.yahoo.com/v8/finance/chart"
+YAHOO_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+}
 
 # Symbols we track by default — easily extended
 DEFAULT_SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"] 
@@ -60,6 +68,7 @@ def fetch_ohlcv(
         f"from {start_date} to {end_date} at interval={interval}"
     )
 
+    symbols = [s.upper() for s in symbols]
     all_rows = []
 
     for symbol in symbols:
@@ -69,7 +78,6 @@ def fetch_ohlcv(
             logger.info(f"  {symbol}: {len(rows)} rows fetched")
         except Exception as e:
             # Log the error but don't crash the whole pipeline.
-            # If AAPL fails, we still want MSFT, GOOGL etc.
             logger.error(f"  {symbol}: FAILED — {e}")
             continue
 
@@ -93,20 +101,107 @@ def _fetch_single_symbol(
     Fetch OHLCV for a single symbol and normalise the column names
     to match our database schema.
     """
-    ticker = yf.Ticker(symbol)
+    raw = None
+    last_error: Optional[Exception] = None
 
-    # yfinance returns a DataFrame indexed by date
-    # auto_adjust=True adjusts prices for stock splits and dividends —
-    # important for accurate historical analysis
-    raw = ticker.history(
-        start=start_date.isoformat(),
-        end=end_date.isoformat(),
-        auto_adjust=True,
-        interval=interval,
+    # Primary path: Yahoo chart endpoint via requests (more stable than yfinance wrapper).
+    for attempt in range(3):
+        try:
+            raw = _history_from_chart_api(symbol, start_date, end_date, interval)
+            if raw is not None and not raw.empty:
+                break
+        except Exception as e:
+            last_error = e
+
+        if attempt < 2:
+            time.sleep(1.5 * (attempt + 1))
+
+    # Secondary fallback: yfinance period query
+    if raw is None or raw.empty:
+        raw = _history_with_period_fallback(symbol, interval)
+
+    if raw is None or raw.empty:
+        if last_error:
+            raise ValueError(f"No data returned for {symbol} ({last_error})")
+        raise ValueError(f"No data returned for {symbol}")
+
+    return _normalise_history_df(raw, symbol)
+
+
+def _history_from_chart_api(symbol: str, start_date: date, end_date: date, interval: str) -> pd.DataFrame:
+    """Fetch history directly from Yahoo chart endpoint."""
+    start_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
+    # period2 acts like an exclusive upper bound; add one day to include end_date bars.
+    end_dt = datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+
+    params = {
+        "period1": int(start_dt.timestamp()),
+        "period2": int(end_dt.timestamp()),
+        "interval": interval,
+        "events": "div,splits",
+        "includePrePost": "false",
+    }
+
+    url = f"{YAHOO_CHART_BASE}/{symbol}"
+    resp = requests.get(url, params=params, headers=YAHOO_HEADERS, timeout=20)
+    resp.raise_for_status()
+    payload = resp.json()
+
+    result = ((payload.get("chart") or {}).get("result") or [])
+    if not result:
+        return pd.DataFrame()
+
+    node = result[0]
+    timestamps = node.get("timestamp") or []
+    quote = ((node.get("indicators") or {}).get("quote") or [{}])[0]
+
+    if not timestamps:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(
+        {
+            "time": pd.to_datetime(timestamps, unit="s", utc=True),
+            "Open": quote.get("open", []),
+            "High": quote.get("high", []),
+            "Low": quote.get("low", []),
+            "Close": quote.get("close", []),
+            "Volume": quote.get("volume", []),
+        }
     )
 
-    if raw.empty:
-        raise ValueError(f"No data returned for {symbol}")
+    # Keep bars with a close value only.
+    df = df[df["Close"].notna()].copy()
+    if df.empty:
+        return df
+
+    df = df.set_index("time")
+    return df
+
+
+def _history_with_period_fallback(symbol: str, interval: str) -> pd.DataFrame:
+    """
+    Fallback Yahoo query using `period` instead of explicit dates.
+    Useful when requested dates are out of available market range.
+    """
+    ticker = yf.Ticker(symbol)
+
+    # 1m is usually capped to recent days; pick a safe period per interval.
+    if interval == "1m":
+        period = "7d"
+    elif interval in {"5m", "15m", "30m", "60m", "90m", "1h"}:
+        period = "60d"
+    else:
+        period = "1y"
+
+    return ticker.history(
+        period=period,
+        interval=interval,
+        auto_adjust=True,
+    )
+
+
+def _normalise_history_df(raw: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    """Normalize Yahoo history DataFrame to our DB schema."""
 
     # Rename columns to match our schema (lowercase, no spaces)
     df = raw.rename(columns={
