@@ -55,13 +55,13 @@ default_args = {
 
 dag = DAG(
     dag_id="stocks_1min",
-    description="Fetch intraday stock OHLCV every 5 minutes on weekdays and load into PostgreSQL",
+    description="Fetch intraday stock OHLCV every 1 minute on weekdays and load into PostgreSQL",
     default_args=default_args,
-    # Every 5 minutes, weekdays (more stable for Yahoo than 1m polling)
-    schedule="*/5 * * * 1-5",
+    # Every 1 minute, weekdays (more stable for Yahoo than 1m polling)
+    schedule="*/1 * * * 1-5",
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["stocks", "intraday", "5min"],
+    tags=["stocks", "intraday", "1min"],
 )
 
 # ── Symbols to track ──────────────────────────────────────────────────────────
@@ -90,7 +90,7 @@ def task_extract(**context):
         SYMBOLS,
         start_date=start_date,
         end_date=end_date,
-        interval="5m",
+        interval="1m",
     )
 
     if df.empty:
@@ -103,7 +103,7 @@ def task_extract(**context):
     )
 
     logger.info(
-        "Extracted %s rows for %s (window %s -> %s, interval=5m)",
+        "Extracted %s rows for %s (window %s -> %s, interval=1m)",
         len(df),
         SYMBOLS,
         start_date,
