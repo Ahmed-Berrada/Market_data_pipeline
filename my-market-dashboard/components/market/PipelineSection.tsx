@@ -25,8 +25,8 @@ export function PipelineSection({ pipeline }: { pipeline: PipelineStatus | null 
             color: "var(--accent)",
           },
           {
-            id: "crypto_5min",
-            schedule: "24/7 · every 5 minutes",
+            id: "crypto_20min",
+            schedule: "24/7 · every 20 minutes",
             symbols: CRYPTOS,
             source: "CoinGecko public API",
             steps: [

@@ -33,13 +33,13 @@ default_args = {
 }
 
 dag = DAG(
-    dag_id="crypto_5min",
-    description="Fetch crypto prices every 5 minutes and load into TimescaleDB",
+    dag_id="crypto_20min",
+    description="Fetch crypto prices every 20 minutes and load into TimescaleDB",
     default_args=default_args,
     schedule="*/20 * * * *",              # every 20 minutes (CoinGecko 10k/month budget)
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["crypto", "5min"],
+    tags=["crypto", "20min"],
 )
 
 SYMBOLS = ["BTC", "ETH", "SOL", "BNB"]

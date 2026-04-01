@@ -12,13 +12,19 @@ import { ChartTooltip } from "@/components/market/ChartParts";
 import { SectionLabel, Tab } from "@/components/market/Primitives";
 import type { AssetType, ChartRange, Indicator, OHLCV } from "@/types/market";
 
-const RANGE_OPTIONS: ChartRange[] = ["5m", "15m", "60m", "1d", "1w", "1mo", "3mo", "6mo", "1y"];
+const RANGE_OPTIONS: ChartRange[] = ["20m", "60m", "1d", "1w", "1mo", "3mo", "6mo", "1y"];
+
+const RANGE_LABEL: Record<ChartRange, string> = {
+  "20m": "20 MIN", "60m": "1 HR", "1d": "TODAY",
+  "1w": "1 WEEK", "1mo": "1 MONTH", "3mo": "3 MONTHS",
+  "6mo": "6 MONTHS", "1y": "1 YEAR",
+};
 const LONG_DAY_RANGES: ChartRange[] = ["1mo", "3mo", "6mo", "1y"];
 
 const formatXAxis = (iso: string, range: ChartRange, spanMs: number): string => {
   const d = new Date(iso);
 
-  if (range === "5m" || range === "15m" || range === "60m" || range === "1d") {
+  if (range === "20m" || range === "60m" || range === "1d") {
     return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   }
 
@@ -121,6 +127,12 @@ export function MarketChartSection({
 
   const chartData = buildChartData(ohlcv, indicators, range);
 
+  const firstClose = chartData[0]?.close ?? null;
+  const lastClose = chartData[chartData.length - 1]?.close ?? null;
+  const rangeReturnPct = firstClose && lastClose ? ((lastClose - firstClose) / firstClose) * 100 : null;
+  const rangeReturnAbs = firstClose && lastClose ? lastClose - firstClose : null;
+  const rangeUp = (rangeReturnPct ?? 0) >= 0;
+
   const spanMs =
     chartData.length > 1
       ? chartData[chartData.length - 1].ts - chartData[0].ts
@@ -165,6 +177,22 @@ export function MarketChartSection({
       )}
 
       <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "clamp(14px, 3vw, 20px)", minHeight: "clamp(200px, 60vh, 300px)", position: "relative" }}>
+        {!loading && rangeReturnPct !== null && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(7px, 1.5vw, 8px)", letterSpacing: "0.2em", color: "var(--text-muted)", marginBottom: 4 }}>
+              {assetType === "stock" ? "RETURN" : "P/L"} · {RANGE_LABEL[range]}
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(14px, 3vw, 18px)", fontWeight: 600, color: rangeUp ? "var(--green)" : "var(--red)" }}>
+                {rangeUp ? "+" : ""}{rangeReturnPct.toFixed(2)}%
+              </span>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(9px, 2vw, 11px)", color: "var(--text-muted)" }}>
+                {rangeUp ? "+" : ""}{rangeReturnAbs!.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+
         {loading && (
           <div
             style={{

@@ -11,8 +11,7 @@ import type {
 const pathFor = (type: AssetType): string => (type === "stock" ? "stocks" : "crypto");
 
 const rangeToMs: Record<ChartRange, number> = {
-  "5m": 5 * 60 * 1000,
-  "15m": 15 * 60 * 1000,
+  "20m": 20 * 60 * 1000,
   "60m": 60 * 60 * 1000,
   "1d": 24 * 60 * 60 * 1000,
   "1w": 7 * 24 * 60 * 60 * 1000,
@@ -23,8 +22,7 @@ const rangeToMs: Record<ChartRange, number> = {
 };
 
 const rangeToLimit: Record<ChartRange, number> = {
-  "5m": 600,
-  "15m": 1200,
+  "20m": 200,
   "60m": 2000,
   "1d": 4000,
   "1w": 6000,
