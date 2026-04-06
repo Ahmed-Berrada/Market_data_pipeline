@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ApiReferenceSection } from "@/components/market/ApiReferenceSection";
 import { ArchitectureSection } from "@/components/market/ArchitectureSection";
-import { DashboardNav, HeroSection, StatsGrid } from "@/components/market/DashboardHeader";
+import { DashboardNav, HeroSection, StatsGrid, WorldClockBar } from "@/components/market/DashboardHeader";
 import { LearnedSection, DashboardFooter } from "@/components/market/LearnedAndFooter";
 import { MarketChartSection } from "@/components/market/MarketChartSection";
 import { MarketTickerSection } from "@/components/market/MarketTickerSection";
@@ -14,7 +14,7 @@ import type { AssetType, ChartRange } from "@/types/market";
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PipelineDashboard() {
-  const [symbol, setSymbol] = useState("AAPL");
+  const [symbol, setSymbol] = useState("SPY");
   const [assetType, setAssetType] = useState<AssetType>("stock");
   const [range, setRange] = useState<ChartRange>("1y");
 
@@ -34,6 +34,7 @@ export default function PipelineDashboard() {
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "clamp(24px, 5vw, 48px) clamp(16px, 5vw, 32px)" }}>
         <HeroSection />
         <StatsGrid pipeline={pipeline} />
+        <WorldClockBar />
 
         <MarketTickerSection symbol={symbol} latests={latests} onSelect={handleSymbol} />
 

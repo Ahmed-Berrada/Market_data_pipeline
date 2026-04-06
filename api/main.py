@@ -90,6 +90,6 @@ def root():
 def list_assets():
     """Returns all symbols currently tracked by the pipeline."""
     return {
-        "stocks": ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"],
-        "crypto": ["BTC", "ETH", "SOL", "BNB"],
+        "stocks": ["SPY", "NVDA", "MSFT", "SIE.DE", "GOOGL", "PLTR", "URTH"],
+        "crypto": ["BTC", "ETH", "SOL", "XRP"],
     }

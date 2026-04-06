@@ -65,7 +65,7 @@ dag = DAG(
 )
 
 # ── Symbols to track ──────────────────────────────────────────────────────────
-SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"]
+SYMBOLS = ["SPY", "NVDA", "MSFT", "SIE.DE", "GOOGL", "PLTR", "URTH"]
 
 
 # ── Task functions ─────────────────────────────────────────────────────────────

@@ -42,7 +42,7 @@ dag = DAG(
     tags=["crypto", "20min"],
 )
 
-SYMBOLS = ["BTC", "ETH", "SOL", "BNB"]
+SYMBOLS = ["BTC", "ETH", "SOL", "XRP"]
 
 
 def _read_xcom_json_df(payload: str):

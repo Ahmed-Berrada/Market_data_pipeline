@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ChartTooltip } from "@/components/market/ChartParts";
+import { CandlestickChart, ChartTooltip } from "@/components/market/ChartParts";
 import { SectionLabel, Tab } from "@/components/market/Primitives";
 import type { AssetType, ChartRange, Indicator, OHLCV } from "@/types/market";
 
@@ -115,6 +115,7 @@ export function MarketChartSection({
   indicators: Indicator[];
 }) {
   const [isMobile, setIsMobile] = useState(false);
+  const [chartMode, setChartMode] = useState<"line" | "candle">("line");
   const [showSma20, setShowSma20] = useState(true);
   const [showSma50, setShowSma50] = useState(true);
 
@@ -164,17 +165,18 @@ export function MarketChartSection({
         </div>
       </div>
 
-      {/* SMA toggles — only shown when indicator data is available */}
-      {hasSma && (
-        <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-          <Tab active={showSma20} onClick={() => setShowSma20((v) => !v)}>
-            SMA 20
-          </Tab>
-          <Tab active={showSma50} onClick={() => setShowSma50((v) => !v)}>
-            SMA 50
-          </Tab>
-        </div>
-      )}
+      {/* Chart mode + SMA toggles */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <Tab active={chartMode === "line"} onClick={() => setChartMode("line")}>LINE</Tab>
+        <Tab active={chartMode === "candle"} onClick={() => setChartMode("candle")}>CANDLE</Tab>
+        {chartMode === "line" && hasSma && (
+          <>
+            <span style={{ width: 1, height: 14, background: "var(--border)", margin: "0 2px" }} />
+            <Tab active={showSma20} onClick={() => setShowSma20((v) => !v)}>SMA 20</Tab>
+            <Tab active={showSma50} onClick={() => setShowSma50((v) => !v)}>SMA 50</Tab>
+          </>
+        )}
+      </div>
 
       <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "clamp(14px, 3vw, 20px)", minHeight: "clamp(200px, 60vh, 300px)", position: "relative" }}>
         {!loading && rangeReturnPct !== null && (
@@ -230,7 +232,7 @@ export function MarketChartSection({
           </div>
         )}
 
-        {!loading && chartData.length > 0 && (
+        {!loading && chartData.length > 0 && chartMode === "line" && (
           <ResponsiveContainer width="100%" height={chartHeight}>
             <LineChart data={chartData} margin={{ top: 8, right: chartMarginRight, bottom: 8, left: chartMarginLeft }}>
               <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
@@ -261,19 +263,23 @@ export function MarketChartSection({
           </ResponsiveContainer>
         )}
 
+        {!loading && ohlcv.length > 0 && chartMode === "candle" && (
+          <CandlestickChart data={ohlcv} />
+        )}
+
         {!loading && chartData.length > 0 && (
           <div style={{ display: "flex", gap: "clamp(12px, 4vw, 20px)", marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{ width: 20, height: 1.5, background: "var(--accent)" }} />
               <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)" }}>Close</span>
             </div>
-            {hasSma && showSma20 && (
+            {chartMode === "line" && hasSma && showSma20 && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <div style={{ width: 20, height: 1.5, background: "#f59e0b" }} />
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)" }}>SMA 20d</span>
               </div>
             )}
-            {hasSma && showSma50 && (
+            {chartMode === "line" && hasSma && showSma50 && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <div style={{ width: 20, height: 1.5, background: "#a78bfa" }} />
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(8px, 2vw, 9px)", color: "var(--text-muted)" }}>SMA 50d</span>

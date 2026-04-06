@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { TECH_STACK } from "@/lib/market/constants";
 import { ago, fmtK } from "@/lib/market/format";
 import type { PipelineStatus } from "@/types/market";
@@ -103,6 +106,101 @@ export function HeroSection() {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── World Clock + Market Status ────────────────────────────────────────────────
+
+type ClockCity = {
+  label: string;
+  tz: string;
+  marketOpen: [number, number];  // [hour, minute] local time
+  marketClose: [number, number];
+};
+
+const CITIES: ClockCity[] = [
+  { label: "NEW YORK",  tz: "America/New_York",  marketOpen: [9, 30],  marketClose: [16, 0]  },
+  { label: "PARIS",     tz: "Europe/Paris",       marketOpen: [9, 0],   marketClose: [17, 30] },
+  { label: "HONG KONG", tz: "Asia/Hong_Kong",     marketOpen: [9, 30],  marketClose: [16, 0]  },
+];
+
+function getLocalTime(tz: string): { time: string; weekday: number; h: number; m: number } {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    weekday: "short",
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const h = parseInt(get("hour"));
+  const m = parseInt(get("minute"));
+  const wd = get("weekday");
+  const time = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  const weekday = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(wd);
+  return { time, weekday, h, m };
+}
+
+function isOpen(city: ClockCity, h: number, m: number, weekday: number): boolean {
+  if (weekday === 0 || weekday === 6) return false;
+  const mins = h * 60 + m;
+  const openMins  = city.marketOpen[0]  * 60 + city.marketOpen[1];
+  const closeMins = city.marketClose[0] * 60 + city.marketClose[1];
+  return mins >= openMins && mins < closeMins;
+}
+
+export function WorldClockBar() {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "clamp(12px, 4vw, 32px)",
+        padding: "clamp(10px, 2vw, 14px) clamp(14px, 3vw, 20px)",
+        background: "var(--bg-2)",
+        border: "1px solid var(--border)",
+        marginBottom: "clamp(24px, 6vw, 36px)",
+        flexWrap: "wrap",
+      }}
+    >
+      {CITIES.map((city) => {
+        const { time, weekday, h, m } = getLocalTime(city.tz);
+        const open = isOpen(city, h, m, weekday);
+        return (
+          <div key={city.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(7px, 1.5vw, 8px)", letterSpacing: "0.2em", color: "var(--text-muted)", marginBottom: 3 }}>
+                {city.label}
+              </div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(13px, 3vw, 16px)", color: "var(--text)", fontWeight: 300, letterSpacing: "0.05em" }}>
+                {time}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
+              <span
+                style={{
+                  fontSize: "clamp(7px, 1.5vw, 8px)",
+                  fontFamily: "var(--font-mono)",
+                  letterSpacing: "0.15em",
+                  color: open ? "var(--accent)" : "var(--text-muted)",
+                }}
+              >
+                {open ? "● OPEN" : "○ CLOSED"}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+      {/* suppress unused tick warning */}
+      <span style={{ display: "none" }}>{tick}</span>
     </div>
   );
 }

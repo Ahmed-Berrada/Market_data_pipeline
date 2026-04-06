@@ -64,7 +64,7 @@ export function ArchitectureSection() {
             DOCKER COMPOSE
           </text>
           <text x={630} y={40} fill="var(--text-muted)" fontSize="7" fontFamily="var(--font-mono)" letterSpacing="0.15em">
-            RAILWAY
+            CLOUD RUN
           </text>
           <text x={795} y={40} fill="var(--text-muted)" fontSize="7" fontFamily="var(--font-mono)" letterSpacing="0.15em">
             VERCEL

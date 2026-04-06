@@ -51,6 +51,7 @@ export function TickerCard({
           </div>
           <div style={{ fontSize: "clamp(8px, 2vw, 10px)", color: up ? "var(--accent)" : "#ef4444", marginTop: 2 }}>
             {up ? "▲" : "▼"} {Math.abs(latest.change_pct).toFixed(2)}%
+            <span style={{ fontSize: "clamp(7px, 1.5vw, 8px)", color: "var(--text-muted)", marginLeft: 4 }}>1D</span>
           </div>
         </>
       ) : (

@@ -1,7 +1,7 @@
 export const API_BASE = " https://market-data-pipeline-143452331112.europe-west1.run.app";
 
-export const STOCKS = ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA", "META", "AMZN"];
-export const CRYPTOS = ["BTC", "ETH", "SOL", "BNB"];
+export const STOCKS = ["SPY", "NVDA", "MSFT", "SIE.DE", "GOOGL", "PLTR", "URTH"];
+export const CRYPTOS = ["BTC", "ETH", "SOL", "XRP"];
 
 export const TECH_STACK = [
   "Python 3.11",
