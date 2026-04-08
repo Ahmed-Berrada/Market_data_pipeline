@@ -98,7 +98,14 @@ def get_crypto_latest(symbol: str):
         raise HTTPException(status_code=500, detail=str(e))
 
     if not rows:
-        raise HTTPException(status_code=404, detail=f"No data for {symbol}")
+        return {
+            "symbol": symbol,
+            "time": None,
+            "price": None,
+            "change": None,
+            "change_pct": None,
+            "volume": None,
+        }
 
     latest = rows[0]
     prev = rows[1] if len(rows) > 1 else None

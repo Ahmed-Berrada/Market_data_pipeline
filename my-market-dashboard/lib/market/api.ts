@@ -76,8 +76,15 @@ export async function fetchChartData(symbol: string, type: AssetType, range: Cha
   };
 }
 
-export async function fetchLatest(symbol: string, type: AssetType): Promise<Latest> {
-  return fetchJson<Latest>(`/api/${pathFor(type)}/${symbol}/latest`);
+export async function fetchLatest(symbol: string, type: AssetType): Promise<Latest | null> {
+  try {
+    const data = await fetchJson<Latest>(`/api/${pathFor(type)}/${symbol}/latest`);
+    // API returns null price when no data exists for the symbol
+    if (data.price == null) return null;
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchPipelineStatus(): Promise<PipelineStatus> {

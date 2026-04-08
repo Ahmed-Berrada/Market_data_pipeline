@@ -34,7 +34,9 @@ export function useMarketDashboard(symbol: string, assetType: AssetType, range: 
     await Promise.allSettled(
       assets.map(async ({ symbol: assetSymbol, type }) => {
         const latest = await fetchLatest(assetSymbol, type);
-        setLatests((prev) => ({ ...prev, [assetSymbol]: latest }));
+        if (latest) {
+          setLatests((prev) => ({ ...prev, [assetSymbol]: latest }));
+        }
       }),
     );
   }, []);

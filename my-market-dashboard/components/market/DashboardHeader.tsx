@@ -152,9 +152,11 @@ function isOpen(city: ClockCity, h: number, m: number, weekday: number): boolean
 }
 
 export function WorldClockBar() {
+  const [mounted, setMounted] = useState(false);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    setMounted(true);
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
@@ -169,11 +171,14 @@ export function WorldClockBar() {
         border: "1px solid var(--border)",
         marginBottom: "clamp(24px, 6vw, 36px)",
         flexWrap: "wrap",
+        minHeight: 52,
       }}
     >
       {CITIES.map((city) => {
-        const { time, weekday, h, m } = getLocalTime(city.tz);
-        const open = isOpen(city, h, m, weekday);
+        const { time, weekday, h, m } = mounted
+          ? getLocalTime(city.tz)
+          : { time: "--:--", weekday: 1, h: 0, m: 0 };
+        const open = mounted ? isOpen(city, h, m, weekday) : false;
         return (
           <div key={city.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div>
