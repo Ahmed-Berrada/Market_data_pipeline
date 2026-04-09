@@ -102,8 +102,8 @@ def backfill_crypto(symbols: list[str], start_date: date, end_date: date):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backfill market data pipeline")
     parser.add_argument("--days", type=int, default=365, help="Number of days to backfill")
-    parser.add_argument("--stocks", nargs="*", default=["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"])
-    parser.add_argument("--crypto", nargs="*", default=["BTC", "ETH", "SOL", "BNB"])
+    parser.add_argument("--stocks", nargs="*", default=["SPY", "NVDA", "MSFT", "SIE.DE", "GOOGL", "PLTR", "URTH"])
+    parser.add_argument("--crypto", nargs="*", default=["BTC", "ETH", "SOL", "XRP"])
     parser.add_argument("--skip-stocks", action="store_true")
     parser.add_argument("--skip-crypto", action="store_true")
     args = parser.parse_args()
@@ -120,6 +120,15 @@ if __name__ == "__main__":
 
     if not args.skip_crypto:
         total_rows += backfill_crypto(args.crypto, start_date, end_date)
+
+    # Refresh TimescaleDB continuous aggregates so dashboards see the backfilled data
+    try:
+        from loaders.timescale_loader import refresh_continuous_aggregates
+        logger.info("Refreshing continuous aggregates...")
+        refresh_continuous_aggregates()
+        logger.info("Continuous aggregates refreshed.")
+    except Exception as e:
+        logger.warning(f"Could not refresh continuous aggregates: {e}")
 
     logger.info(f"\nBackfill complete. Total rows inserted: {total_rows}")
     logger.info("Open the Airflow UI at http://localhost:8080 to monitor ongoing runs.")

@@ -55,7 +55,7 @@ default_args = {
 
 dag = DAG(
     dag_id="stocks_1min",
-    description="Fetch intraday stock OHLCV every 1 minute on weekdays and load into PostgreSQL",
+    description="Fetch intraday stock OHLCV every 1 minute on weekdays and load into TimescaleDB",
     default_args=default_args,
     # Every 1 minute, weekdays (more stable for Yahoo than 1m polling)
     schedule="*/1 * * * 1-5",
@@ -165,6 +165,10 @@ def task_load(**context):
 
     rows_prices = load_stock_prices(clean_df)
     rows_indicators = load_indicators(indicators_df)
+
+    # Refresh TimescaleDB continuous aggregates so the dashboard is up to date
+    from loaders.timescale_loader import refresh_continuous_aggregates
+    refresh_continuous_aggregates()
 
     total = rows_prices + rows_indicators
     ti.xcom_push(key="rows_prices_inserted", value=rows_prices)

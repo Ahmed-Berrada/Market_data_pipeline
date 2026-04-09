@@ -107,6 +107,10 @@ def task_load(**context):
     rows_prices = load_crypto_prices(clean_df)
     rows_indicators = load_indicators(indicators_df)
 
+    # Refresh TimescaleDB continuous aggregates so the dashboard is up to date
+    from loaders.timescale_loader import refresh_continuous_aggregates
+    refresh_continuous_aggregates()
+
     total = rows_prices + rows_indicators
     ti.xcom_push(key="rows_prices_inserted", value=rows_prices)
     ti.xcom_push(key="rows_indicators_inserted", value=rows_indicators)

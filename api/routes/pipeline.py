@@ -2,12 +2,14 @@
 api/routes/pipeline.py
 ========================
 Pipeline status endpoint — powers the "last updated" card on the dashboard.
+Uses TimescaleDB-specific functions for fast approximate row counts and
+hypertable size/compression stats.
 """
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
-from loaders.timescale_loader import get_engine
+from loaders.timescale_loader import get_engine, get_approximate_row_counts, get_hypertable_stats
 
 router = APIRouter()
 
@@ -15,8 +17,8 @@ router = APIRouter()
 @router.get("/status")
 def get_pipeline_status():
     """
-    Returns last run info for all DAGs and a database row count summary.
-    This powers the "Pipeline Status" card on the portfolio dashboard.
+    Returns last run info for all DAGs, approximate row counts (instant via
+    TimescaleDB), and hypertable size/compression stats.
     """
     try:
         engine = get_engine()
@@ -46,11 +48,11 @@ def get_pipeline_status():
                 ORDER BY normalized_dag_id, run_at DESC
             """)).fetchall()
 
-            # Row counts per table
-            counts = {}
-            for table in ["stock_prices", "crypto_prices", "price_indicators"]:
-                row = conn.execute(text(f"SELECT COUNT(*) FROM {table}")).fetchone()
-                counts[table] = row[0] if row else 0
+        # Approximate row counts — instant via TimescaleDB (no full table scan)
+        counts = get_approximate_row_counts(engine)
+
+        # Hypertable storage & compression info
+        hypertable_info = get_hypertable_stats(engine)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -67,4 +69,5 @@ def get_pipeline_status():
             for r in runs
         ],
         "row_counts": counts,
+        "hypertables": hypertable_info,
     }

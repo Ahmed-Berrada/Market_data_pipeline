@@ -45,12 +45,20 @@ const fromForRange = (range: ChartRange): string => {
   return d.toISOString();
 };
 
-async function fetchJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) {
-    throw new Error(`Request failed (${res.status}) for ${path}`);
+async function fetchJson<T>(path: string, retries = 3): Promise<T> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`);
+      if (res.ok) return (await res.json()) as T;
+      // Retry on 5xx, throw immediately on 4xx
+      if (res.status < 500) throw new Error(`Request failed (${res.status}) for ${path}`);
+    } catch (err) {
+      if (attempt === retries - 1) throw err;
+    }
+    // Exponential backoff: 500ms, 1s, 2s
+    await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
   }
-  return (await res.json()) as T;
+  throw new Error(`Request failed after ${retries} retries for ${path}`);
 }
 
 export async function fetchChartData(symbol: string, type: AssetType, range: ChartRange): Promise<{

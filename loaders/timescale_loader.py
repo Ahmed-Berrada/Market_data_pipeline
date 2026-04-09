@@ -1,7 +1,7 @@
 """
 loaders/timescale_loader.py
 ==============================
-The LOAD step of our ETL pipeline.
+The LOAD step of our ETL pipeline — now powered by TimescaleDB.
 
 Key concepts:
   - We use INSERT ... ON CONFLICT DO NOTHING (upsert)
@@ -13,6 +13,10 @@ Key concepts:
     poolers (e.g. Supabase port 6543) — those can route the temp-table
     CREATE and the subsequent SELECT to different backend connections,
     making the temp table invisible.
+
+  - After each load we can refresh the TimescaleDB continuous aggregates
+    so the dashboard reflects new data immediately (in addition to the
+    automatic hourly refresh policy).
 
   - We log every run to the pipeline_runs table so the dashboard
     can show "last updated X minutes ago".
@@ -30,7 +34,7 @@ from sqlalchemy.engine import Engine
 
 logger = logging.getLogger(__name__)
 
-CHUNK_SIZE = 500
+CHUNK_SIZE = 100
 
 # Module-level singleton — avoids creating a new connection pool per request.
 _engine: Engine | None = None
@@ -196,6 +200,90 @@ def get_latest_run(dag_id: Optional[str] = None, engine: Optional[Engine] = None
         "rows_inserted": row.rows_inserted,
         "duration_seconds": float(row.duration_seconds) if row.duration_seconds else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# TimescaleDB-specific helpers
+# ---------------------------------------------------------------------------
+
+def refresh_continuous_aggregates(engine: Optional[Engine] = None) -> None:
+    """
+    Manually refresh the continuous aggregates after an ETL run.
+
+    The automatic policy refreshes every hour, but calling this right after
+    a load ensures the dashboard shows new data immediately.
+    """
+    eng = engine or get_engine()
+    # CALL … cannot run inside a transaction block, so we use AUTOCOMMIT.
+    with eng.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        for view in ("stock_daily_summary", "crypto_daily_summary"):
+            try:
+                conn.execute(text(f"""
+                    CALL refresh_continuous_aggregate(
+                        '{view}',
+                        NOW() - INTERVAL '3 days',
+                        NOW()
+                    );
+                """))
+                logger.info(f"Refreshed continuous aggregate: {view}")
+            except Exception as exc:
+                # Non-fatal: the hourly policy will catch up
+                logger.warning(f"Could not refresh {view}: {exc}")
+
+
+def get_approximate_row_counts(engine: Optional[Engine] = None) -> dict:
+    """
+    Use TimescaleDB's approximate_row_count() for instant row counts.
+    Falls back to COUNT(*) if the function is unavailable.
+    """
+    eng = engine or get_engine()
+    counts = {}
+    with eng.connect() as conn:
+        for table in ("stock_prices", "crypto_prices", "price_indicators"):
+            try:
+                row = conn.execute(
+                    text(f"SELECT approximate_row_count('{table}')")
+                ).fetchone()
+                counts[table] = row[0] if row else 0
+            except Exception:
+                row = conn.execute(
+                    text(f"SELECT COUNT(*) FROM {table}")
+                ).fetchone()
+                counts[table] = row[0] if row else 0
+    return counts
+
+
+def get_hypertable_stats(engine: Optional[Engine] = None) -> list[dict]:
+    """
+    Return size and compression info for each hypertable.
+    Useful for the pipeline status dashboard.
+    """
+    eng = engine or get_engine()
+    with eng.connect() as conn:
+        try:
+            rows = conn.execute(text("""
+                SELECT
+                    hypertable_name,
+                    pg_size_pretty(hypertable_size(format('%I', hypertable_name)::regclass)) AS total_size,
+                    pg_size_pretty(
+                        hypertable_size(format('%I', hypertable_name)::regclass)
+                        - pg_total_relation_size(format('%I', hypertable_name)::regclass)
+                    ) AS compressed_size
+                FROM timescaledb_information.hypertables
+                WHERE hypertable_schema = 'public'
+                ORDER BY hypertable_name
+            """)).fetchall()
+            return [
+                {
+                    "table": r.hypertable_name,
+                    "total_size": r.total_size,
+                    "compressed_size": r.compressed_size,
+                }
+                for r in rows
+            ]
+        except Exception as exc:
+            logger.warning(f"Could not fetch hypertable stats: {exc}")
+            return []
 
 
 # ── Quick test ─────────────────────────────────────────────────────────────────
