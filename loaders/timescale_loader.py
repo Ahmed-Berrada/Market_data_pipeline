@@ -234,7 +234,7 @@ def refresh_continuous_aggregates(engine: Optional[Engine] = None) -> None:
 def get_approximate_row_counts(engine: Optional[Engine] = None) -> dict:
     """
     Use TimescaleDB's approximate_row_count() for instant row counts.
-    Falls back to COUNT(*) if the function is unavailable.
+    Falls back to COUNT(*) if the function returns 0 (stale stats) or is unavailable.
     """
     eng = engine or get_engine()
     counts = {}
@@ -244,7 +244,14 @@ def get_approximate_row_counts(engine: Optional[Engine] = None) -> dict:
                 row = conn.execute(
                     text(f"SELECT approximate_row_count('{table}')")
                 ).fetchone()
-                counts[table] = row[0] if row else 0
+                count = row[0] if row else 0
+                # approximate_row_count returns 0 when stats are stale — fall back
+                if count == 0:
+                    row = conn.execute(
+                        text(f"SELECT COUNT(*) FROM {table}")
+                    ).fetchone()
+                    count = row[0] if row else 0
+                counts[table] = count
             except Exception:
                 row = conn.execute(
                     text(f"SELECT COUNT(*) FROM {table}")
