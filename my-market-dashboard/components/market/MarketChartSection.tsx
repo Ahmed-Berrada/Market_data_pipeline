@@ -264,7 +264,7 @@ export function MarketChartSection({
         )}
 
         {!loading && ohlcv.length > 0 && chartMode === "candle" && (
-          <CandlestickChart data={ohlcv} />
+          <CandlestickChart data={ohlcv} range={range} />
         )}
 
         {!loading && chartData.length > 0 && (
