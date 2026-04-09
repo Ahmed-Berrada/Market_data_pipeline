@@ -32,20 +32,35 @@ logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 500
 
+# Module-level singleton — avoids creating a new connection pool per request.
+_engine: Engine | None = None
+
 
 def get_engine() -> Engine:
     """
-    Create a SQLAlchemy engine from the DATABASE_URL environment variable.
+    Return a shared SQLAlchemy engine (singleton).
     pool_pre_ping checks the connection is alive before using it — prevents
     errors when the DB restarts or the connection times out.
+    pool_size=3 + max_overflow=2 keeps us well under Supabase's session limit.
     """
+    global _engine
+    if _engine is not None:
+        return _engine
+
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
         raise RuntimeError(
             "DATABASE_URL not set. "
             "Set it in your .env file or Docker environment."
         )
-    return create_engine(db_url, pool_pre_ping=True)
+    _engine = create_engine(
+        db_url,
+        pool_pre_ping=True,
+        pool_size=3,
+        max_overflow=2,
+        pool_recycle=300,
+    )
+    return _engine
 
 
 def load_stock_prices(df: pd.DataFrame, engine: Optional[Engine] = None) -> int:
