@@ -103,7 +103,7 @@ def run_crypto():
 
     if raw_df.empty:
         logger.warning("No crypto data fetched. Skipping.")
-        log_pipeline_run("crypto_5min", "skipped", rows_inserted=0, duration_seconds=0)
+        log_pipeline_run("crypto_20min", "skipped", rows_inserted=0, duration_seconds=0)
         return
 
     # ── Transform ─────────────────────────────────────────────────────────

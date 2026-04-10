@@ -1,6 +1,6 @@
 # Market Data Pipeline
 
-A production-style data engineering project that ingests, transforms, stores, and serves real-time stock and crypto market data.
+A production-style data engineering project that ingests, transforms, stores, and serves real-time stock and crypto market data — powered by TimescaleDB, orchestrated with Airflow locally and Cloud Run Jobs in production.
 
 **Live demo:** [ahmedberrada.com/marketdatapipeline](https://ahmedberrada.com/marketdatapipeline)
 **API docs:** [https://market-data-pipeline-143452331112.europe-west1.run.app/docs](https://market-data-pipeline-143452331112.europe-west1.run.app/docs)
@@ -9,32 +9,36 @@ A production-style data engineering project that ingests, transforms, stores, an
 
 ## What it does
 
-- Fetches 5-minute OHLCV data for 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, META, TSLA) via Yahoo Finance
-- Fetches 20-minute prices for 4 crypto assets (BTC, ETH, SOL, BNB) via CoinGecko
+- Fetches 1-minute OHLCV data for 7 stocks (SPY, NVDA, MSFT, SIE.DE, GOOGL, PLTR, URTH) via Yahoo Finance
+- Fetches 5-minute prices for 4 crypto assets (BTC, ETH, SOL, XRP) via CoinGecko
 - Cleans and validates the data, computes SMA-20, SMA-50, and daily returns
-- Stores everything in PostgreSQL (Supabase) with time-series optimised schema
-- Schedules and orchestrates all of this with Apache Airflow
+- Stores everything in **TimescaleDB Cloud** with hypertables, continuous aggregates, and compression
+- Schedules pipelines with **Airflow** (local) and **Cloud Run Jobs + Cloud Scheduler** (production)
 - Exposes the data via a FastAPI REST API
-- Displays live charts on a Next.js dashboard deployed to Vercel
+- Displays interactive candlestick and line charts on a Next.js dashboard
 
 ---
 
 ## Architecture
 
 ```
-Yahoo Finance API  ──┐
-                     ├── Airflow DAGs ── Python ETL ── PostgreSQL ── FastAPI ── Next.js Dashboard
-CoinGecko API      ──┘                                (Supabase)  (Cloud Run)   (Vercel)
+                            ┌─ Local ──────────────┐
+Yahoo Finance API  ──┐      │  Airflow DAGs        │
+                     ├──────┤                      ├── TimescaleDB ── FastAPI ── Next.js Dashboard
+CoinGecko API      ──┘      │  Cloud Run Jobs +    │     (Cloud)    (Cloud Run)     (Vercel)
+                            │  Cloud Scheduler     │
+                            └──────────────────────┘
 ```
 
 **Stack:**
-- Python 3.11 — data fetching, transformation, loading
-- Apache Airflow 2.9 — scheduling and orchestration
-- PostgreSQL (Supabase) — time-series data storage
-- FastAPI — REST API layer
-- Docker Compose — local development
-- Google Cloud Run — API hosting
-- Next.js + Recharts — portfolio dashboard
+- **Python 3.11** — data fetching, transformation, loading
+- **Apache Airflow 2.9** — local scheduling and orchestration (Docker Compose)
+- **Google Cloud Run Jobs + Cloud Scheduler** — production scheduling (no Airflow needed)
+- **TimescaleDB Cloud** — time-series storage with hypertables, continuous aggregates, compression
+- **FastAPI** — REST API layer
+- **Docker Compose** — local development (Airflow + API)
+- **Google Cloud Run** — API hosting
+- **Next.js + Recharts + custom SVG** — interactive dashboard with candlestick charts
 
 ---
 
@@ -43,6 +47,7 @@ CoinGecko API      ──┘                                (Supabase)  (Cloud R
 ### Prerequisites
 - Docker + Docker Compose installed
 - Python 3.11+ (for running scripts outside Docker)
+- A TimescaleDB instance (cloud or self-hosted)
 
 ### 1. Clone and configure
 
@@ -51,10 +56,21 @@ git clone https://github.com/ahmedberrada/market-data-pipeline
 cd market-data-pipeline
 
 cp .env.example .env
-# Edit .env — set DATABASE_URL and optionally x_cg_demo_api_key
+# Edit .env:
+#   DATABASE_URL=postgresql://user:pass@host:port/db?sslmode=require
+#   X_CG_DEMO_API_KEY=your-coingecko-demo-key
 ```
 
-### 2. Start all services
+### 2. Initialise the database
+
+```bash
+# Run the schema against your TimescaleDB instance
+psql "$DATABASE_URL" -f db/schema.sql
+```
+
+This creates hypertables, continuous aggregates, and compression policies.
+
+### 3. Start all services
 
 ```bash
 docker compose up -d
@@ -62,36 +78,31 @@ docker compose up -d
 
 This starts:
 - **Airflow Webserver** on port 8080 (admin / admin)
-- **Airflow Scheduler** (background)
+- **Airflow Scheduler** (background) — runs the DAGs automatically
 - **FastAPI** on port 8000
 
-First startup takes ~2 minutes as Airflow initialises its database.
+First startup takes ~2 minutes as Airflow initialises its metadata database.
 
-### 3. Seed historical data
+### 4. Seed historical data
 
 ```bash
-# Install deps locally (for the backfill script)
 pip install -r requirements.txt
-
-# Backfill 1 year of data
 python scripts/backfill.py --days 365
 ```
 
-This takes ~3 minutes and inserts ~2,500 rows per stock symbol.
-
-### 4. Verify everything works
+### 5. Verify everything works
 
 ```bash
 # API health check
 curl http://localhost:8000/
 
-# Latest AAPL price
-curl http://localhost:8000/api/stocks/AAPL/latest
+# Latest SPY price
+curl http://localhost:8000/api/stocks/SPY/latest
 
 # BTC OHLCV history
 curl "http://localhost:8000/api/crypto/BTC/ohlcv?from=2024-01-01"
 
-# Pipeline status
+# Pipeline status (includes row counts and hypertable stats)
 curl http://localhost:8000/api/pipeline/status
 ```
 
@@ -100,43 +111,45 @@ Airflow UI: **http://localhost:8080** (admin / admin)
 
 ---
 
-## Running the tests
-
-```bash
-pip install -r requirements.txt
-pytest tests/ -v
-```
-
----
-
 ## Project structure
 
 ```
-├── dags/                     # Airflow DAGs (scheduled jobs)
-│   ├── stocks_dag.py         # Runs weekdays every 5 min (intraday)
-│   └── crypto_dag.py         # Runs every 20 minutes (24/7)
-├── extractors/               # API fetching logic
-│   ├── yfinance_extractor.py # Yahoo Finance → DataFrame
-│   └── coingecko_extractor.py# CoinGecko → DataFrame
+├── dags/                      # Airflow DAGs (local scheduling)
+│   ├── stock_dag.py           # stocks_1min — every 1 min on weekdays
+│   └── crypto_dag.py          # crypto_20min — every 20 min, 24/7
+├── jobs/
+│   └── run_pipeline.py        # Standalone ETL runner for Cloud Run Jobs
+├── extractors/
+│   ├── yfinance_extractor.py  # Yahoo Finance → DataFrame
+│   └── coingecko_extractor.py # CoinGecko → DataFrame
 ├── transformers/
-│   └── ohlcv_transformer.py  # Clean + compute indicators
+│   └── ohlcv_transformer.py   # Clean + compute indicators (SMA-20, SMA-50)
 ├── loaders/
-│   └── timescale_loader.py   # Write to PostgreSQL
-├── api/                      # FastAPI REST API
+│   └── timescale_loader.py    # Write to TimescaleDB (chunked upserts)
+├── api/
 │   ├── main.py
 │   └── routes/
-│       ├── stocks.py
-│       ├── crypto.py
-│       └── pipeline.py
+│       ├── stocks.py          # /api/stocks/{symbol}/...
+│       ├── crypto.py          # /api/crypto/{symbol}/...
+│       └── pipeline.py        # /api/pipeline/status (row counts, hypertable stats)
 ├── db/
-│   └── schema.sql            # Table definitions (auto-runs on first start)
+│   ├── schema.sql             # TimescaleDB schema (hypertables, aggregates, compression)
+│   └── deduplicate_and_constraints.sql  # Migration script from plain PostgreSQL
 ├── scripts/
-│   └── backfill.py           # One-shot historical data seeder
-├── docker-compose.yml
-├── Dockerfile.api
+│   └── backfill.py            # One-shot historical data seeder (1 year)
+├── deploy/
+│   └── deploy_jobs.sh         # Cloud Run Jobs + Cloud Scheduler deployment
+├── docker-compose.yml         # Local dev: Airflow + API + Postgres (metadata)
+├── Dockerfile.api             # FastAPI container (Cloud Run)
+├── Dockerfile.jobs            # ETL job container (Cloud Run Jobs)
 └── requirements.txt
 
-my-market-dashboard/          # Next.js dashboard (deployed to Vercel)
+my-market-dashboard/           # Next.js dashboard (deployed to Vercel)
+├── app/                       # App Router pages
+├── components/market/         # Charts, ticker cards, pipeline view
+├── hooks/                     # useMarketDashboard custom hook
+├── lib/market/                # API client, formatting, constants
+└── types/                     # TypeScript interfaces
 ```
 
 ---
@@ -153,7 +166,7 @@ my-market-dashboard/          # Next.js dashboard (deployed to Vercel)
 | `GET /api/crypto/{symbol}/ohlcv` | Crypto historical OHLCV |
 | `GET /api/crypto/{symbol}/latest` | Latest crypto price |
 | `GET /api/crypto/{symbol}/indicators` | Crypto SMA-20, SMA-50, daily returns |
-| `GET /api/pipeline/status` | Last run times, row counts |
+| `GET /api/pipeline/status` | Last run times, row counts, hypertable stats |
 
 Full interactive docs at `/docs`.
 
@@ -161,24 +174,123 @@ Full interactive docs at `/docs`.
 
 ## Data model
 
-**PostgreSQL tables** (auto-partitioned by time index):
+**TimescaleDB hypertables** (7-day chunk intervals, automatic compression after 7 days):
 
-- `stock_prices` — raw OHLCV for stocks
-- `crypto_prices` — raw OHLCV for crypto
-- `price_indicators` — pre-computed SMA-20, SMA-50, daily return
-- `pipeline_runs` — audit log of every pipeline execution
+| Table | Description | Unique index |
+|---|---|---|
+| `stock_prices` | 1-minute OHLCV for stocks | `(time, symbol)` |
+| `crypto_prices` | 5-minute OHLCV for crypto | `(time, symbol)` |
+| `price_indicators` | SMA-20, SMA-50, daily return | `(time, symbol, asset_type)` |
+| `pipeline_runs` | Audit log of every pipeline execution | Regular table |
 
-**Materialised views** (pre-aggregated for fast dashboard queries):
-- `stock_daily_summary` — daily candles
-- `crypto_daily_summary`
+**Continuous aggregates** (auto-refreshed hourly, 3-day window):
+- `stock_daily_summary` — daily OHLCV candles per stock
+- `crypto_daily_summary` — daily OHLCV candles per crypto
+
+**Compression:** enabled on `stock_prices` and `crypto_prices`, segmented by `symbol`, ordered by `time DESC`. Automatically compresses chunks older than 7 days.
+
+The loader uses `ON CONFLICT (...) DO NOTHING` — running the same pipeline twice produces identical results.
+
+---
+
+## Scheduling
+
+### Local (Airflow)
+
+```bash
+docker compose up -d
+```
+
+| DAG | Schedule | Description |
+|---|---|---|
+| `stocks_1min` | `*/1 * * * 1-5` | Every minute on weekdays |
+| `crypto_20min` | `*/20 * * * *` | Every 20 minutes, 24/7 |
+
+Both DAGs follow the same 4-task pattern: **extract → transform → load → log_success**. After loading, they refresh TimescaleDB continuous aggregates.
+
+### Production (Cloud Run Jobs + Cloud Scheduler)
+
+No Airflow required in production. Two Cloud Run Jobs run the same ETL logic:
+
+| Job | Trigger | Schedule |
+|---|---|---|
+| `stock-pipeline` | `trigger-stock-pipeline` | `*/1 9-16 * * 1-5` (market hours EST) |
+| `crypto-pipeline` | `trigger-crypto-pipeline` | `*/20 * * * *` |
+
+**Deploy to production:**
+
+```bash
+# Set your GCP project
+gcloud config set project YOUR_PROJECT_ID
+export REGION=europe-west1
+
+# Enable required APIs
+gcloud services enable run.googleapis.com cloudscheduler.googleapis.com artifactregistry.googleapis.com
+
+# Create Artifact Registry repo
+gcloud artifacts repositories create market-pipeline \
+  --repository-format=docker --location=$REGION
+
+# Build and push the job image
+gcloud auth configure-docker ${REGION}-docker.pkg.dev
+docker build -f Dockerfile.jobs -t ${REGION}-docker.pkg.dev/$(gcloud config get-value project)/market-pipeline/pipeline-job:latest .
+docker push ${REGION}-docker.pkg.dev/$(gcloud config get-value project)/market-pipeline/pipeline-job:latest
+
+# Create Cloud Run Jobs (set env vars from .env)
+source <(grep -v '^#' .env | sed 's/^/export /')
+
+gcloud run jobs create stock-pipeline \
+  --image=${REGION}-docker.pkg.dev/$(gcloud config get-value project)/market-pipeline/pipeline-job:latest \
+  --region=$REGION --task-timeout=300s --max-retries=2 \
+  --set-env-vars="DATABASE_URL=${DATABASE_URL}" \
+  --args="--pipeline,stocks"
+
+gcloud run jobs create crypto-pipeline \
+  --image=${REGION}-docker.pkg.dev/$(gcloud config get-value project)/market-pipeline/pipeline-job:latest \
+  --region=$REGION --task-timeout=300s --max-retries=3 \
+  --set-env-vars="DATABASE_URL=${DATABASE_URL},X_CG_DEMO_API_KEY=${X_CG_DEMO_API_KEY}" \
+  --args="--pipeline,crypto"
+
+# Create Cloud Scheduler triggers
+PROJECT_ID=$(gcloud config get-value project)
+
+gcloud scheduler jobs create http trigger-stock-pipeline \
+  --location=$REGION --schedule="*/1 9-16 * * 1-5" --time-zone="America/New_York" \
+  --uri="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/stock-pipeline:run" \
+  --http-method=POST \
+  --oauth-service-account-email="${PROJECT_ID}@appspot.gserviceaccount.com"
+
+gcloud scheduler jobs create http trigger-crypto-pipeline \
+  --location=$REGION --schedule="*/20 * * * *" --time-zone="UTC" \
+  --uri="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/crypto-pipeline:run" \
+  --http-method=POST \
+  --oauth-service-account-email="${PROJECT_ID}@appspot.gserviceaccount.com"
+
+# Grant invoker permissions
+gcloud run jobs add-iam-policy-binding stock-pipeline --region=$REGION \
+  --member="serviceAccount:${PROJECT_ID}@appspot.gserviceaccount.com" --role="roles/run.invoker"
+gcloud run jobs add-iam-policy-binding crypto-pipeline --region=$REGION \
+  --member="serviceAccount:${PROJECT_ID}@appspot.gserviceaccount.com" --role="roles/run.invoker"
+```
+
+**Useful commands:**
+```bash
+# Execute a job manually
+gcloud run jobs execute stock-pipeline --region=$REGION --wait
+
+# Check execution history
+gcloud run jobs executions list --job=stock-pipeline --region=$REGION
+
+# Pause/resume a scheduler
+gcloud scheduler jobs pause trigger-stock-pipeline --location=$REGION
+gcloud scheduler jobs resume trigger-stock-pipeline --location=$REGION
+```
 
 ---
 
 ## Deployment
 
-### Backend (Google Cloud Run)
-
-The API is containerised and deployed to Google Cloud Run (europe-west1).
+### API (Google Cloud Run)
 
 ```bash
 gcloud run deploy market-data-pipeline \
@@ -188,8 +300,8 @@ gcloud run deploy market-data-pipeline \
   --allow-unauthenticated
 ```
 
-Set the following environment variables in the Cloud Run console:
-- `DATABASE_URL` — your Supabase connection string
+Environment variables to set:
+- `DATABASE_URL` — TimescaleDB connection string
 - `CORS_ALLOWED_ORIGINS` — comma-separated list of allowed frontend origins
 
 ### Frontend (Vercel)
@@ -205,13 +317,14 @@ Set `NEXT_PUBLIC_API_URL` to your Cloud Run API URL.
 
 ## What I learned
 
-- **DAGs and orchestration** — how Airflow schedules and retries tasks
-- **Time-series schemas** — optimised indexes, materialised views, and why partitioning matters
+- **DAGs and orchestration** — how Airflow schedules and retries tasks, and how to replace it with Cloud Run Jobs for production
+- **TimescaleDB** — hypertables, continuous aggregates, compression policies, and why they outperform vanilla PostgreSQL for time-series data
 - **ETL pattern** — clean separation of Extract, Transform, Load concerns
 - **Data quality** — validating freshness, deduplication, handling nulls at the pipeline level
 - **Idempotent pipelines** — running the same pipeline twice produces the same result (ON CONFLICT DO NOTHING)
 - **OHLCV and financial indicators** — what the data actually means, SMA interpretation
-- **Cloud Run deployment** — containerising a FastAPI app and deploying to GCP
+- **Cloud Run Jobs** — serverless batch workloads triggered by Cloud Scheduler — no always-on infra needed
+- **GCP IAM** — service account permissions, invoker roles, and how Cloud Scheduler authenticates to Cloud Run
 
 ---
 
@@ -219,23 +332,7 @@ Set `NEXT_PUBLIC_API_URL` to your Cloud Run API URL.
 
 | API | What for | Limit |
 |---|---|---|
-| Yahoo Finance (yfinance) | Stock OHLCV (5-min intraday) | No official limit (unofficial API) |
-| CoinGecko public | Crypto OHLCV (20-min candles) | 10,000 req/month |
+| Yahoo Finance (yfinance) | Stock OHLCV (1-min intraday) | No official limit (unofficial API) |
+| CoinGecko demo | Crypto OHLCV (5-min candles) | 10,000 req/month |
 
 No paid API keys required to run this project locally.
-
----
-
-## Scheduler
-
-Airflow is the primary orchestrator for this project.
-
-- **Stocks DAG** (`stocks_1min`): every 5 minutes on weekdays — fetches the last 7 days of 5-min bars, deduplicates on insert
-- **Crypto DAG** (`crypto_5min`): every 20 minutes 24/7 — respects the 10k/month CoinGecko budget (≈8,640 calls/month at 4 symbols)
-
-The loader uses `ON CONFLICT (...) DO NOTHING` and the schema enforces unique indexes:
-- `stock_prices (time, symbol)`
-- `crypto_prices (time, symbol)`
-- `price_indicators (time, symbol, asset_type)`
-
-This prevents duplicates when the same backfill window runs multiple times.
