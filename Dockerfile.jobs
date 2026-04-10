@@ -1,0 +1,26 @@
+# =============================================================================
+# Dockerfile for Cloud Run Jobs (ETL pipeline runner)
+# =============================================================================
+# Lightweight image that runs extract → transform → load without Airflow.
+# Used by: gcloud run jobs execute stock-pipeline --args="--pipeline,stocks"
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps for psycopg2
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy only what the job needs (no Airflow, no API)
+COPY extractors/ extractors/
+COPY transformers/ transformers/
+COPY loaders/ loaders/
+COPY jobs/ jobs/
+
+ENTRYPOINT ["python", "-m", "jobs.run_pipeline"]
