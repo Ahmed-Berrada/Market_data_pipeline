@@ -2,7 +2,7 @@
 
 A production-style data engineering project that ingests, transforms, stores, and serves real-time stock and crypto market data — powered by TimescaleDB, orchestrated with Airflow locally and Cloud Run Jobs in production.
 
-**Live demo:** [ahmedberrada.com/marketdatapipeline](https://ahmedberrada.com/marketdatapipeline)
+**Live demo:** [marketdatapipeline.ahmedberrada.com](https://marketdatapipeline.ahmedberrada.com/)
 **API docs:** [https://market-data-pipeline-143452331112.europe-west1.run.app/docs](https://market-data-pipeline-143452331112.europe-west1.run.app/docs)
 
 ---
